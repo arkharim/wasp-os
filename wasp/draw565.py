@@ -18,8 +18,8 @@ B = const(0b00000_000000_11111)
 
 @micropython.viper
 def _bitblit(bitbuf, pixels, bgfg: int, count: int):
-    mv = ptr16(bitbuf)
-    px = ptr8(pixels)
+    mv = ptr16(bitbuf) #Points to a 16 bit half-word.
+    px = ptr8(pixels) #Points to a byte
 
     # Extract and byte-swap
     bg = ((bgfg >> 24) & 0xff) + ((bgfg >> 8) & 0xff00)
@@ -64,7 +64,8 @@ def _clut8_rgb565(i: int) -> int:
 
 @micropython.viper
 def _fill(mv, color: int, count: int, offset: int):
-    p = ptr16(mv)
+#llena el buffer que despues escribira en pantalla con el color que quiere. dentro del rango seleccionado.
+    p = ptr16(mv) #Points to a 16 bit half-word.
     color = (color >> 8) + ((color & 0xff) << 8)
 
     for x in range(offset, offset+count):
@@ -84,7 +85,7 @@ def _bounding_box(s, font):
 
 @micropython.native
 def _draw_glyph(display, glyph, x, y, bgfg):
-    (px, h, w) = glyph
+    (px, h, w) = glyph #el glyph es una tira de bytes + altura+ancho
 
     buf = display.linebuffer[0:2*(w+1)]
     buf[2*w] = bgfg >> 24
@@ -152,18 +153,18 @@ class Draw565(object):
 
         display.set_window(x, y, w, h)
 
-        remaining = w * h
+        remaining = w * h #pixeles que hay en el cuadrado. y los que quedan por rellenar. no es toda la pantalla
 
         # Populate the line buffer
         buf = display.linebuffer
-        sz = len(buf) // 2
-        _fill(buf, bg, min(sz, remaining), 0)
+        sz = len(buf) // 2 # tamaño de los pixles. el buff es x2.
+        _fill(buf, bg, min(sz, remaining), 0) #aqui prepara el buff con el color (bg) pixel a pixel hasta que se acabe el area arellenar..
 
-        display.quick_start()
-        while remaining >= sz:
+        display.quick_start() #"enciende la pantalla" para el llenar el nuevo color.
+        while remaining >= sz: #pinta linea a linea.
             quick_write(buf)
             remaining -= sz
-        if remaining:
+        if remaining:#no se que hace.
             quick_write(buf[0:2*remaining])
         display.quick_end()
 
@@ -221,24 +222,25 @@ class Draw565(object):
         """Decode and draw a 2-bit RLE image."""
         display = self._display
         quick_write = display.quick_write
-        sx = image[1]
-        sy = image[2]
-        rle = memoryview(image)[3:]
+        sx = image[1] #ancho imagen
+        sy = image[2] #alto imagen
+        rle = memoryview(image)[3:] #informacion codificada de la imagen
 
-        display.set_window(x, y, sx, sy)
+        display.set_window(x, y, sx, sy) #prepara el area de pintar.
 
         if sx <= (len(display.linebuffer) // 4) and not bool(sy & 1):
             sx *= 2
             sy //= 2
 
-        palette = array.array('H', (0, c1, c2, fg))
+        palette = array.array('H', (0, c1, c2, fg)) #Array de unsigned shrot (int) Con los 4 valores que le pasa. No se que es c1 y c2.
         next_color = 1
         rl = 0
-        buf = display.linebuffer[0:2*sx]
+        buf = display.linebuffer[0:2*sx] #prepara la lnea del buffer a llenar.
         bp = 0
 
         display.quick_start()
         for op in rle:
+            #aqui creo que calcula la longutid de losa bits con el mismo color.
             if rl == 0:
                 px = op >> 6
                 rl = op & 0x3f
@@ -262,11 +264,11 @@ class Draw565(object):
 
             while rl:
                 count = min(sx - bp, rl)
-                _fill(buf, palette[px], count, bp)
+                _fill(buf, palette[px], count, bp) #preapra el buffer con los colores. el bp es el offset.
                 bp += count
                 rl -= count
 
-                if bp >= sx:
+                if bp >= sx: #compreba que no se salte de ancho y si no lo pinta.
                     quick_write(buf)
                     bp = 0
         display.quick_end()
@@ -318,15 +320,21 @@ class Draw565(object):
             else:
                 leftpad = (width - w) // 2
                 rightpad = width - w - leftpad
+            leftpad = (width - w) // 2
+            rightpad = width - w - leftpad
+            #TODO aqui es donde pinta toda la linea de negro antes del string.
             self.fill(bg, x, y, leftpad, h)
             x += leftpad
 
         for ch in s:
             glyph = font.get_ch(ch)
             _draw_glyph(display, glyph, x, y, bgfg)
+            #TODO aqui es donde creo que rellena el fondo del texto.
+            self.fill(bg, x+glyph[2], y, 1, glyph[1]) #glyph[2] = ancho, glyph[1] = altura
             x += glyph[2] + 1
 
         if width:
+            #TODO aqui es donde pinta toda la linea de negro despues del string.
             self.fill(bg, x, y, rightpad, h)
 
     def bounding_box(self, s):
@@ -521,3 +529,363 @@ class Draw565(object):
         b = bm - step if bm > step else 0
 
         return (r | g | b)
+
+    @micropython.native
+    def get_blit_color(self, image, x, y, fg=0xffff, c1=0x4a69, c2=0x7bef):
+        """Decode and return the pixel color.
+
+        :param image: Image data in either 1-bit RLE or 2-bit RLE formats. The
+                      format will be autodetected
+        :param x: X coordinate for the pixel in the image
+        :param y: Y coordinate for the pixel in the image
+        """
+        if len(image) == 3:
+            # Legacy 1-bit image
+            return self._get_rle1blit_color(image, x, y, fg)
+        else:
+            # 2-bit RLE image, (255x255, v1)
+            return self._get_rle2bit_color(image, x, y, fg, c1, c2)
+
+    @micropython.native
+    def _get_rle1blit_color(self, image, x, y, fg=0xffff, bg=0):
+        """Decode a 1-bit RLE image and return the pixel color.
+
+        :param image: Image data in either 1-bit RLE formats
+        :param x: X coordinate for the pixel in the image
+        :param y: Y coordinate for the pixel in the image
+        """
+        #display = self._display
+        #write_data = display.write_data
+        (sx, sy, rle) = image
+
+        #display.set_window(x, y, sx, sy)
+
+        #buf = memoryview(display.linebuffer)[0:2*sx]
+        bp = 0
+        sy_count = 0
+        color = bg
+
+        for rl in rle:
+            while rl:
+                count = min(sx - bp, rl)
+                #_fill(buf, color, count, bp)
+                if bp <= x < (bp + count) and sy_count == y:
+                    return color
+                bp += count
+                rl -= count
+
+                if bp >= sx:
+                    #write_data(buf)
+                    sy_count += 1
+                    bp = 0
+
+            if color == bg:
+                color = fg
+            else:
+                color = bg
+
+    @micropython.native
+    def _get_rle2bit_color(self, image, x, y, fg=0xffff, c1=0x4a69, c2=0x7bef):
+        """Decode a 2-bit RLE image and return the pixel color.
+
+        :param image: Image data in either 2-bit RLE formats
+        :param x: X coordinate for the pixel in the image
+        :param y: Y coordinate for the pixel in the image
+        """
+        display = self._display
+        sx = image[1]
+        sy = image[2]
+        rle = memoryview(image)[3:]
+
+        if sx <= (len(display.linebuffer) // 4) and not bool(sy & 1):
+            sx *= 2
+            sy //= 2
+            y //= 2
+
+        palette = array.array('H', (0, c1, c2, fg))
+        next_color = 1
+        rl = 0
+        bp = 0
+        sy_count = 0
+
+        for op in rle:
+            if rl == 0:
+                px = op >> 6
+                rl = op & 0x3f
+                if 0 == rl:
+                    rl = -1
+                    continue
+                if rl >= 63:
+                    continue
+            elif rl > 0:
+                rl += op
+                if op >= 255:
+                    continue
+            else:
+                palette[next_color] = _clut8_rgb565(op)
+                if next_color < 3:
+                    next_color += 1
+                else:
+                    next_color = 1
+                rl = 0
+                continue
+
+            while rl:
+                count = min(sx - bp, rl)
+                if bp <= x < (bp + count) and sy_count == y:
+                    return palette[px]
+                bp += count
+                rl -= count
+
+                if bp >= sx:
+                    sy_count += 1
+                    bp = 0
+
+
+    @micropython.native
+    def _redraw_rle2bit(self, image, pixels, fg=0xffff, c1=0x4a69, c2=0x7bef):
+        """Decode a 2-bit RLE image and return the pixel color.
+
+        :param image: Image data in either 2-bit RLE formats
+        :param x: X coordinate for the pixel in the image
+        :param y: Y coordinate for the pixel in the image
+        """
+        # print('inicio rl')
+        # import wasp
+        # print(wasp.watch.rtc.get_localtime() ) # Wall time formatted as (yyyy, mm, dd, HH, MM, SS, wday, yday)
+
+        display = self._display
+        rawblit = display.rawblit
+        set_window = display.set_window
+        quick_write = display.quick_write
+        sx = image[1]
+        sy = image[2]
+
+        rle = memoryview(image)[3:]
+
+        pixels = sorted(pixels)
+        # print('sorted pixel')
+        # print(pixels)
+        i = 0
+        x = pixels[i][1]
+        y = pixels[i][0]
+        #display.set_window(x, y, 1, 1)
+
+        if sx <= (len(display.linebuffer) // 4) and not bool(sy & 1):
+            sx *= 2
+            sy //= 2
+            y //= 2
+        #TODO en el _rlebit es antes del if.
+        #display.set_window(x, y, 1, 1)
+        # Order the pixels
+        # px = [0]*(len(pixels))
+        # i = 0
+        # for p in pixels:
+        #     px[i] = p[0]+p[1]*sy
+
+        # TODO, no me mola. al final le voy a pasar toda la imagen (240px) y ira lento yo creo. quizas la opcion en pasarle todo en 1 paquete? las hands incluidas?
+        palette = array.array('H', (0, c1, c2, fg))
+        next_color = 1
+        rl = 0
+        #TODO yo diria que es 1
+        #buf = memoryview(display.linebuffer)[0:2 * sx]
+        buf = memoryview(display.linebuffer)[0:2] #pixel a pixel. tamaño de 1 pixel.
+        bp = 0
+
+        sy_count = 0
+
+        display.quick_start()
+        for op in rle:
+            if rl == 0:
+                px = op >> 6
+                rl = op & 0x3f
+                if 0 == rl:
+                    rl = -1
+                    continue
+                if rl >= 63:
+                    continue
+            elif rl > 0:
+                rl += op
+                if op >= 255:
+                    continue
+            else:
+                palette[next_color] = _clut8_rgb565(op)
+                if next_color < 3:
+                    next_color += 1
+                else:
+                    next_color = 1
+                rl = 0
+                continue
+
+            while rl:
+                count = min(sx - bp, rl)
+                #TODO la detection de cambio de linea usar con bits. como el glyph o el fill.
+                if bp <= x < (bp + count) and sy_count == y:
+                    # self.fill(palette[px], x, y, 1, 1) #Funciona!!
+
+                    set_window(x, y, 1, 1)
+                    _fill(buf, palette[px], 1, 0)
+                    quick_write(buf)
+                    #print('jajaj')
+                    #return palette[px]
+                    #print (palette[px])
+                    #print(x)hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+                    #print(y)
+                    #_fill(buf, palette[px], count, bp)
+                    # print('x: ', x)
+                    # print('y: ', y)
+                    # print()
+                    # print('color: ',palette[px])
+                    # print('color: ', hex(palette[px]))
+                    # print('color from get color: ', self.get_blit_color(image, x, y))
+                    # #_fill(buf, palette[px], 1, x)
+                    # palette[px] = (palette[px] >> 8) + ((palette[px] & 0xff) << 8)
+                    # print('color: ', palette[px])
+                    # print(op)
+
+                    #self.fill(0xffff, x, y, 1, 1)
+                    #quick_write(buf)
+                    i += 1
+                    while i < len(pixels):
+                        x = pixels[i][1]
+                        y = pixels[i][0]
+                        # display.set_window(x, y, 1, 1)
+                        if sx <= (len(display.linebuffer) // 4) and not bool(sy & 1):
+                            y //= 2
+
+                        if bp <= x < (bp + count) and sy_count == y:
+                            # print('dentro del if del while')
+                            # print('x: ', x)
+                            # print('y: ', y)
+                            # print()
+                            # self.fill(palette[px], x, y, 1, 1) #Funciona!!!
+                            set_window(x, y, 1, 1)
+                            _fill(buf, palette[px], 1, 0)
+                            quick_write(buf)
+                            i += 1
+                        else:
+                            break
+                    # if i < len(pixels):
+                    #     x = pixels[i][1]
+                    #     y = pixels[i][0]
+                    #
+                    #     #display.set_window(x, y, 1, 1)
+                    #     if sx <= (len(display.linebuffer) // 4) and not bool(sy & 1):
+                    #         y //= 2
+                    # else:
+                    if i >= len(pixels):
+                        #print('exit')
+                        # print('i: ',i)
+                        # print('acabo rl via rapida')
+                        #TODO revisar como salir elegantemente de ambos for y while.
+                        display.quick_end()
+                        return
+                    #rawblit(bytearray([palette[px]]), x, y, 1, 1)
+                #_fill(buf, palette[px], count, bp)  # preapra el buffer con los colores. el bp es el offset.
+                bp += count
+                rl -= count
+
+                if bp >= sx:
+                    sy_count += 1
+                    # quick_write(buf)
+                    #quick_write(buf)
+                    bp = 0
+        # print('acabo rl')
+        display.quick_end()
+
+
+# @micropython.native
+# def get_rle2bit_pixel_color(self, image, x, y, fg=0xffff, c1=0x4a69, c2=0x7bef):
+#     """TODO Decode and draw a 2-bit RLE image."""
+#     display = self._display
+#     # quick_write = display.quick_write
+#     sx = image[1]  # ancho imagen
+#     sy = image[2]  # alto imagen
+#     rle = memoryview(image)[3:]  # informacion codificada de la imagen
+#     print("sx inicial: ", sx)
+#     print("sy inical: ", sy)
+#     # display.set_window(x, y, sx, sy) #prepara el area de pintar.
+#
+#     if sx <= (len(display.linebuffer) // 4) and not bool(sy & 1):
+#         sx *= 2
+#         sy //= 2
+#         print("sx modificado: ", sx)
+#         print("sy modificado: ", sy)
+#         y //= 2  # TODO escalo la y deseada tmb
+#
+#     palette = array.array('H', (
+#     0, c1, c2, fg))  # Array de unsigned shrot (int) Con los 4 valores que le pasa. No se que es c1 y c2.
+#     next_color = 1
+#     rl = 0
+#     # buf = memoryview(display.linebuffer)[0:2*sx] #prepara la lnea del buffer a llenar.
+#     bp = 0
+#
+#     y_count = 0  #
+#
+#     # display.quick_start()
+#     for op in rle:
+#         # print("empieza el for")
+#         # aqui creo que calcula la longutid de losa bits con el mismo color.
+#         if rl == 0:
+#             px = op >> 6
+#             rl = op & 0x3f
+#             if 0 == rl:
+#                 rl = -1
+#                 continue
+#             if rl >= 63:
+#                 continue
+#         elif rl > 0:
+#             rl += op
+#             if op >= 255:
+#                 continue
+#         else:
+#             palette[next_color] = _clut8_rgb565(op)
+#             if next_color < 3:
+#                 next_color += 1
+#             else:
+#                 next_color = 1
+#             rl = 0
+#             continue
+#         # print("rl is: ", rl)
+#         # print("empieza el while")
+#         while rl:
+#             count = min(sx - bp, rl)
+#             # print("sx is: ", sx) #es el ancho de la imgen o de la pantall? siempre fijo.
+#             # print("bp is: ",bp)
+#             # print("rl is: ",rl)
+#             # print("count is: ", count)
+#
+#             # yo creo que no tengo que tener en cuenta la poxicion en el eje de las x.
+#             # TODO solo consigo la primera fila. no se como leer el resto :(. me falta saber como calcular las filas.
+#             # if (sx-bp) > rl:
+#             if bp + rl >= sx:
+#                 y_count += 1
+#             if bp <= x and (bp + count) > x and y_count / 2 == y:  # TODO no tengo claro si deberia ser count o rl.
+#                 # color = palette[px]
+#                 # color = (color >> 8) + ((color & 0xff) << 8)
+#                 print("y count: ", y_count)
+#                 return palette[px]  #
+#
+#             # _fill(buf, palette[px], count, bp) #preapra el buffer con los colores. el bp es el offset.
+#             bp += count
+#             rl -= count
+#             # print("nuevo rl es: ", rl)
+#             # print ("nuevo bp es: ", bp)
+#
+#             if bp >= sx:  # compreba que no se salte de ancho y si no lo pinta. nunca entra cn la imagen del rainbow
+#                 # return 0xffff #"aqui mi error"
+#                 y_count += 1  #
+#                 # print("ajajajaja")
+#                 # print(y_count)
+#                 # quick_write(buf)
+#                 bp = 0
+#
+#             # y_count += 1  #
+#         # print("acaba el while")
+#         # TODO, lo sigo sin encontrar....
+#         # y_count += 1  # aqui seguro que no va, no lo cuenta bien
+#         # print('y count: ', y_count)
+#
+#     # display.quick_end()
+#
+#     # return 0x005F #sirve?
