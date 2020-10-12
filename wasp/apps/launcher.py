@@ -71,6 +71,15 @@ class LauncherApp():
 
     def _draw(self):
         """Redraw the display from scratch."""
+        def string_wrapped(long_string, width):
+            """String sliced within specified width"""
+            chunks = draw.wrap(long_string, width)
+            lines = len(chunks)-1
+            s_wrapped = [x for x in range(lines)]
+            for i in range(lines):
+                s_wrapped[i] = long_string[chunks[i]:chunks[i+1]]
+            return s_wrapped
+
         def draw_app(app, x, y):
             if not app:
                 return
