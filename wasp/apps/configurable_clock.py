@@ -15,6 +15,9 @@ import icons
 import fonts.clock as digits
 import math
 
+# to debug time
+import time
+
 _DIGITS = (
         digits.clock_0,
         digits.clock_1,
@@ -261,6 +264,7 @@ class ConfigurableClockApp():
         self._on_screen = now
 
     def _update_analog_clock(self, now):
+        starttime = time.process_time()
         # Draw the new _hand: Hours, Minutes, Seconds
         #TODO need to only update to be lazy. The code below don't work because the hnads are no correctly updated.
 
@@ -274,6 +278,9 @@ class ConfigurableClockApp():
             self._update_hand(now[5], 60, 120, 120, _second_hand, self._old_hand_second, _second_hand_shape[0])
         if now[4] != self._on_screen[4] or self._on_screen[5] == self._on_screen[4]:
             self._update_hand(now[4], 60, 120, 120, _minute_hand, self._old_hand_minutes, _minuter_hand_shape[0])
+
+        endtime = time.process_time()
+        print(endtime-starttime)
 
     def _update_digital_clock(self, now):
         # TODO Add support for background image
