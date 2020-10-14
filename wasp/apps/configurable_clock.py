@@ -14,6 +14,7 @@ import wasp
 import icons
 import fonts.clock as digits
 import math
+import draw565
 
 # to debug time
 import time
@@ -85,8 +86,8 @@ def _hand_generator(hand_shape):
 
 
 _hour_hand = _hand_generator(_hour_hand_shape)
-_minute_hand = _hand_generator(_hour_hand_shape)
-_second_hand = _hand_generator(_hour_hand_shape)
+_minute_hand = _hand_generator(_minuter_hand_shape)
+_second_hand = _hand_generator(_second_hand_shape)
 
 # Background images. Only 240x240px.
 # _bg_image = icons.pine64_logo
@@ -211,10 +212,10 @@ class ConfigurableClockApp():
         for i in range(len(_hour_hand)):
             self._old_hand_hours[i] = [0,0]
 
-        for i in range(len(_hour_hand)):
+        for i in range(len(_minute_hand)):
             self._old_hand_minutes[i] = [0,0]
 
-        for i in range(len(_hour_hand)):
+        for i in range(len(_second_hand)):
             self._old_hand_second[i] = [0,0]
 
     def _draw_digital_clock(self):
