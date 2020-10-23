@@ -641,21 +641,88 @@ class Draw565(object):
                     sy_count += 1
                     bp = 0
 
+    @micropython.native
+    def redraw_blit(self, image, pixels, fg=0xffff, c1=0x4a69, c2=0x7bef):
+        """Decode and drawn the pixels.
+
+        :param image: Image data in either 1-bit RLE or 2-bit RLE formats. The
+                      format will be autodetected
+        :param pixels: [(Y1,X1),(Y2,X2),...] list of coordinate for the pixel in the image
+        """
+        if len(image) == 3:
+            # Legacy 1-bit image
+            return self._redraw_rle1bit(image, pixels, fg)
+        else:
+            # 2-bit RLE image, (255x255, v1)
+            return self._redraw_rle2bit(image, pixels, fg, c1, c2)
+
+    @micropython.native
+    def _redraw_rle1bit(self, image, pixels, fg=0xffff, bg=0):
+        """Decode a 1-bit RLE image and drawn the pixels.
+
+        :param image: Image data in either 2-bit RLE formats
+        :param pixels: [(Y1,X1),(Y2,X2),...] list of coordinate for the pixel in the image
+        """
+        display = self._display
+        quick_write = display.quick_write
+        set_window = display.set_window
+        (sx, sy, rle) = image
+
+        pixels = sorted(pixels)
+        i = 0
+        x = pixels[i][1]
+        y = pixels[i][0]
+
+        buf = memoryview(display.linebuffer)[0:2]  # pixel a pixel. tamaño de 1 pixel.
+        bp = 0
+        sy_count = 0
+        color = bg
+
+        for rl in rle:
+            while rl:
+                count = min(sx - bp, rl)
+                if bp <= x < (bp + count) and sy_count == y:
+                    set_window(x, y, 1, 0)
+                    _fill(buf, color, 1, 0)
+                    quick_write(buf)
+                    i += 1
+                    while i < len(pixels):
+                        x = pixels[i][1]
+                        y = pixels[i][0]
+                        if bp <= x < (bp + count) and sy_count == y:
+                            set_window(x, y, 1, 1)
+                            _fill(buf, color, 1, 0)
+                            quick_write(buf)
+                            i += 1
+                        else:
+                            break
+                    if i >= len(pixels):
+                        #TODO revisar como salir elegantemente de ambos for y while.
+                        display.quick_end()
+                        return
+
+                bp += count
+                rl -= count
+
+                if bp >= sx:
+                    sy_count += 1
+                    bp = 0
+
+            if color == bg:
+                color = fg
+            else:
+                color = bg
+        display.quick_end()
 
     @micropython.native
     def _redraw_rle2bit(self, image, pixels, fg=0xffff, c1=0x4a69, c2=0x7bef):
-        """Decode a 2-bit RLE image and return the pixel color.
+        """Decode a 2-bit RLE image and drawn the pixels.
 
         :param image: Image data in either 2-bit RLE formats
-        :param x: X coordinate for the pixel in the image
-        :param y: Y coordinate for the pixel in the image
+        :param pixels: [(Y1,X1),(Y2,X2),...] list of coordinate for the pixel in the image
         """
-        # print('inicio rl')
-        # import wasp
-        # print(wasp.watch.rtc.get_localtime() ) # Wall time formatted as (yyyy, mm, dd, HH, MM, SS, wday, yday)
-
         display = self._display
-        rawblit = display.rawblit
+        #rawblit = display.rawblit
         set_window = display.set_window
         quick_write = display.quick_write
         sx = image[1]
@@ -664,34 +731,20 @@ class Draw565(object):
         rle = memoryview(image)[3:]
 
         pixels = sorted(pixels)
-        # print('sorted pixel')
-        # print(pixels)
         i = 0
         x = pixels[i][1]
         y = pixels[i][0]
-        #display.set_window(x, y, 1, 1)
 
         if sx <= (len(display.linebuffer) // 4) and not bool(sy & 1):
             sx *= 2
             sy //= 2
             y //= 2
-        #TODO en el _rlebit es antes del if.
-        #display.set_window(x, y, 1, 1)
-        # Order the pixels
-        # px = [0]*(len(pixels))
-        # i = 0
-        # for p in pixels:
-        #     px[i] = p[0]+p[1]*sy
 
-        # TODO, no me mola. al final le voy a pasar toda la imagen (240px) y ira lento yo creo. quizas la opcion en pasarle todo en 1 paquete? las hands incluidas?
         palette = array.array('H', (0, c1, c2, fg))
         next_color = 1
         rl = 0
-        #TODO yo diria que es 1
-        #buf = memoryview(display.linebuffer)[0:2 * sx]
-        buf = memoryview(display.linebuffer)[0:2] #pixel a pixel. tamaño de 1 pixel.
+        buf = memoryview(display.linebuffer)[0:2] # Drawn pixel by pixel
         bp = 0
-
         sy_count = 0
 
         display.quick_start()
@@ -719,78 +772,36 @@ class Draw565(object):
 
             while rl:
                 count = min(sx - bp, rl)
-                #TODO la detection de cambio de linea usar con bits. como el glyph o el fill.
                 if bp <= x < (bp + count) and sy_count == y:
-                    # self.fill(palette[px], x, y, 1, 1) #Funciona!!
-
+                    # self.fill(palette[px], x, y, 1, 1)
                     set_window(x, y, 1, 1)
                     _fill(buf, palette[px], 1, 0)
                     quick_write(buf)
-                    #print('jajaj')
-                    #return palette[px]
-                    #print (palette[px])
-                    #print(x)hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-                    #print(y)
-                    #_fill(buf, palette[px], count, bp)
-                    # print('x: ', x)
-                    # print('y: ', y)
-                    # print()
-                    # print('color: ',palette[px])
-                    # print('color: ', hex(palette[px]))
-                    # print('color from get color: ', self.get_blit_color(image, x, y))
-                    # #_fill(buf, palette[px], 1, x)
-                    # palette[px] = (palette[px] >> 8) + ((palette[px] & 0xff) << 8)
-                    # print('color: ', palette[px])
-                    # print(op)
-
-                    #self.fill(0xffff, x, y, 1, 1)
-                    #quick_write(buf)
                     i += 1
                     while i < len(pixels):
                         x = pixels[i][1]
                         y = pixels[i][0]
-                        # display.set_window(x, y, 1, 1)
                         if sx <= (len(display.linebuffer) // 4) and not bool(sy & 1):
                             y //= 2
-
                         if bp <= x < (bp + count) and sy_count == y:
-                            # print('dentro del if del while')
-                            # print('x: ', x)
-                            # print('y: ', y)
-                            # print()
-                            # self.fill(palette[px], x, y, 1, 1) #Funciona!!!
                             set_window(x, y, 1, 1)
                             _fill(buf, palette[px], 1, 0)
                             quick_write(buf)
                             i += 1
                         else:
                             break
-                    # if i < len(pixels):
-                    #     x = pixels[i][1]
-                    #     y = pixels[i][0]
-                    #
-                    #     #display.set_window(x, y, 1, 1)
-                    #     if sx <= (len(display.linebuffer) // 4) and not bool(sy & 1):
-                    #         y //= 2
-                    # else:
                     if i >= len(pixels):
-                        #print('exit')
-                        # print('i: ',i)
-                        # print('acabo rl via rapida')
                         #TODO revisar como salir elegantemente de ambos for y while.
                         display.quick_end()
                         return
-                    #rawblit(bytearray([palette[px]]), x, y, 1, 1)
-                #_fill(buf, palette[px], count, bp)  # preapra el buffer con los colores. el bp es el offset.
+
                 bp += count
                 rl -= count
 
                 if bp >= sx:
                     sy_count += 1
-                    # quick_write(buf)
-                    #quick_write(buf)
                     bp = 0
-        # print('acabo rl')
+
         display.quick_end()
 
 
