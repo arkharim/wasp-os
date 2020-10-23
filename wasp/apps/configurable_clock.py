@@ -15,8 +15,9 @@ import icons
 import fonts.clock as digits
 import math
 import draw565
+import micropython
 
-# to debug time
+# TODO only to check the performance
 import time
 
 _DIGITS = (
@@ -37,9 +38,9 @@ _MONTH = 'JanFebMarAprMayJunJulAugSepOctNovDec'
 red, yellow, green, cyan, blue, magenta, white, black = 0xf800, 0xffe0, 0x07e0, 0x07ff, 0x001f, 0xf81f, 0xffff, 0x0000
 
 # TODO a diferencia del analog clock, aquí se debe poner uno detras del otro, "en fila india".
-_hour_hand_shape = [white, (0, 75, 1, 4)]  # color, (initial, final, xresolution, width)
-_minuter_hand_shape = [red, (0, 100, 1, 4)]  # color, (initial, final, xresolution, width)
-_second_hand_shape = [white, (0, 110, 1, 5)]  # color, (initial, final, xresolution, width)
+# _hour_hand_shape = [white, (0, 75, 1, 4)]  # color, (initial, final, xresolution, width)
+# _minuter_hand_shape = [red, (0, 100, 1, 4)]  # color, (initial, final, xresolution, width)
+# _second_hand_shape = [white, (0, 110, 1, 5)]  # color, (initial, final, xresolution, width)
 
 # Forma del analog
 # shapelist = [(0.00, 1.00, 2),
@@ -47,8 +48,29 @@ _second_hand_shape = [white, (0, 110, 1, 5)]  # color, (initial, final, xresolut
 #              (0.18, 0.82, 4),
 #              (0.21, 0.79, 5)]
 
-#_hand_shape = [(0, 100, 1, 4)]  # initial, final, xresolution, width
+# Analog clock hands equal to: https://gitlab.com/purlupar/wasp-faces/-/tree/master/watchfaces.
+# _hour_hand_shape = [white, (0, 15, 1, 2),
+#                     (15, 18, 1, 3),
+#                     (19, 21, 1, 4),
+#                     (22, 79, 1, 5),
+#                     (80, 82, 1, 4),
+#                     (83, 85, 1, 3),
+#                     (86, 100, 1, 2)]  # color, (initial, final, xresolution, width)
+# _minuter_hand_shape = [red, (0, 15, 1, 2),
+#                     (15, 18, 1, 3),
+#                     (19, 21, 1, 4),
+#                     (22, 79, 1, 5),
+#                     (80, 82, 1, 4),
+#                     (83, 85, 1, 3),
+#                     (86, 100, 1, 2)]  # color, (initial, final, xresolution, width)
+# _second_hand_shape = [white, (0, 100, 2, 1)]  # color, (initial, final, xresolution, width)
 
+_hour_hand_shape = [red, (0, 70, 1, 2)]  # color, (initial, final, xresolution, width)
+_minuter_hand_shape = [red, (0, 95, 1, 2)]  # color, (initial, final, xresolution, width)
+_second_hand_shape = [green, (0, 105, 1, 2)]  # color, (initial, final, xresolution, width)
+
+# Old shape
+#_hand_shape = [(0, 100, 1, 4)]  # initial, final, xresolution, width
 # Hand definition. Don't hesiated with the memory fragmentation
 # _hand = []
 # for i in _hand_shape:
@@ -84,14 +106,30 @@ def _hand_generator(hand_shape):
                 i += 1
     return hand
 
+# # TODO con el espesor en medio. A optimizar el proceso.
+# def _hand_generator(hand_shape):
+#     l_hand = 0
+#     for i in hand_shape[1:]:
+#         # l_hand += ((i[1]-i[0])//i[2] + (i[1]-i[0]) % i[2])*i[3]
+#         l_hand += ((i[1] - i[0]) // i[2] + (i[1] - i[0]) % i[2])
+#     hand = [0]*l_hand
+#     i = 0
+#     for shape in hand_shape[1:]:
+#         # for y in range(shape[3]):
+#         #     y = y-shape[3]//2-shape[3] % 2 + 1
+#         for x in range(shape[0], shape[1], shape[2]):
+#                 hand[i] = [x, shape[3]] # en vez las y, pongo el espesor.
+#                 i += 1
+#     return hand
+
 
 _hour_hand = _hand_generator(_hour_hand_shape)
 _minute_hand = _hand_generator(_minuter_hand_shape)
 _second_hand = _hand_generator(_second_hand_shape)
 
 # Background images. Only 240x240px.
-# _bg_image = icons.pine64_logo
-_bg_image = icons.pine64_rainbow
+_bg_image = icons.pine64_logo
+# _bg_image = icons.pine64_rainbow
 
 #Background color. Only used when no background image is drawn.
 _bg = black
@@ -127,7 +165,7 @@ class ConfigurableClockApp():
         self._meter = wasp.widgets.BatteryMeter()  # Add battery widget
         self._notifier = wasp.widgets.StatusBar()  # Add notifications bar. For example, bluetooth
         #TODO configuration can be outside of class?
-        self._bg_image = False  # True to draw a background image
+        self._bg_image = True  # True to draw a background image
         self._analog_clock = True  # True for draw analog clock
         self._digital_clock = False  # True for draw digital clock
         self._heart = False  # True for draw heart rate
@@ -204,19 +242,22 @@ class ConfigurableClockApp():
         self._update()
 
     def _draw_analog_clock(self):
-        self._draw_bezel(120, 120, 118, 120, 2, 1, bz_1)  # 1 minutes marks
-        self._draw_bezel(120, 120, 115, 120, 2, 5, bz_5)  # 5 minutes marks
-        self._draw_bezel(120, 120, 100, 110, 6, 5, bz_15)  # 15 minutes marks
+        # self._draw_bezel(120, 120, 118, 120, 2, 1, bz_1)  # 1 minutes marks
+        # self._draw_bezel(120, 120, 115, 120, 2, 5, bz_5)  # 5 minutes marks
+        # self._draw_bezel(120, 120, 100, 110, 6, 5, bz_15)  # 15 minutes marks
+        self._draw_bezel(120, 120, 112, 118, 2, 1, bz_1)  # 1 minutes marks
+        self._draw_bezel(120, 120, 107, 118, 3, 5, bz_5)  # 5 minutes marks
+        self._draw_bezel(120, 120, 107, 118, 4, 15, bz_15)  # 15 minutes marks
 
         # Reset the on screen hand
         for i in range(len(_hour_hand)):
-            self._old_hand_hours[i] = [0,0]
+            self._old_hand_hours[i] = [5,5]
 
         for i in range(len(_minute_hand)):
-            self._old_hand_minutes[i] = [0,0]
+            self._old_hand_minutes[i] = [5,5]
 
         for i in range(len(_second_hand)):
-            self._old_hand_second[i] = [0,0]
+            self._old_hand_second[i] = [5,5]
 
     def _draw_digital_clock(self):
         draw = wasp.watch.drawable
@@ -234,13 +275,12 @@ class ConfigurableClockApp():
         """
         draw = wasp.watch.drawable
         w2 = width // 2
-        length = out_radius - inner_radius
         for time in range(0, 60, time_label):
             angle = 6 * time
             cos = math.cos(math.radians(angle))
             sin = math.sin(math.radians(angle))
             for pix in range(inner_radius, out_radius):
-                # TODO no calculo bien el ancho. no estoy rotando la imagen
+                # TODO Not correct, the image is not rotating
                 draw.fill(color, int(x_center + cos * pix - w2), int(y_center + sin * pix - w2), width, width)
 
     def _update(self):
@@ -279,7 +319,9 @@ class ConfigurableClockApp():
             self._update_hand(now[5], 60, 120, 120, _second_hand, self._old_hand_second, _second_hand_shape[0])
         if now[4] != self._on_screen[4] or self._on_screen[5] == self._on_screen[4]:
             self._update_hand(now[4], 60, 120, 120, _minute_hand, self._old_hand_minutes, _minuter_hand_shape[0])
-
+        # draw = wasp.watch.drawable
+        # draw.fill(_bg, 120, 60+now[5]-1, 120,5)
+        # draw.fill( _hour_hand_shape[0], 120, 60 + now[5], 120, 15)
         endtime = time.process_time()
         print(endtime-starttime)
 
@@ -302,21 +344,100 @@ class ConfigurableClockApp():
                 draw.string('{} {} {}'.format(now[2], month, now[0]), 0, 180, width=240)
 
     def _update_hand(self, time, dial_number, x_center, y_center, hand, on_screen_hand, color):
+        # TODO need to be optimized. Use a buffer with all modifications before to update the screen.
         draw = wasp.watch.drawable
+        display = draw._display
+        quick_write = display.quick_write
+        set_window = display.set_window
+        _fill = draw565._fill
         angle = 360/dial_number * time - 90
-        cos = math.cos(math.radians(-angle))
-        sin = math.sin(math.radians(-angle))
+        cos = math.cos(math.radians(angle))
+        sin = math.sin(math.radians(angle))
 
         # Erase the old hand
         if self._bg_image:
-            #TODO Add suport for 1rle images
-            draw._redraw_rle2bit(_bg_image, on_screen_hand)
+            draw.redraw_blit(_bg_image, on_screen_hand)
+            # Paint the new hand
+            for i in range(len(hand)):
+                # Redraw from the middle. I don't like how it's displayed.
+                # on_screen_hand[i] = [y_center + int(hand[i][0] * sin),
+                #                      x_center + int(hand[i][0] * cos)]
+                # draw.fill(color, on_screen_hand[i][1] - hand[i][1] // 2, on_screen_hand[i][0] - hand[i][1] // 2,
+                #           hand[i][1], hand[i][1])
+
+                # Redraw pixel a pixel.
+                on_screen_hand[i] = [int(y_center - int(hand[i][1] * cos - hand[i][0] * sin)),
+                                     int(x_center + int(hand[i][0] * cos + hand[i][1] * sin))]
+                # draw.fill(color, on_screen_hand[i][1], on_screen_hand[i][0], 1, 1)
+                buf = memoryview(display.linebuffer)[0:2*1]
+                set_window(on_screen_hand[i][1], on_screen_hand[i][0], 1, 1)
+                _fill(buf, color, 1, 0)
+                quick_write(buf)
+
         else:
             for i in range(len(on_screen_hand)):
-                draw.fill(_bg, on_screen_hand[i][1], on_screen_hand[i][0], 1, 1)
+                # Redraw from the middle. I don't like how it's displayed.
+                # Don't work well with background image and hand drawn from the middle. On_screen_hand don't have all
+                # pixels
+                # on_screen_hand[i] = [y_center + int(hand[i][0] * sin),
+                #                      x_center + int(hand[i][0] * cos)]
+                # draw.fill(_bg, on_screen_hand[i][1]-hand[i][1]//2, on_screen_hand[i][0]-hand[i][1]//2, hand[i][1],
+                #           hand[i][1])
+                # draw.fill(color, on_screen_hand[i][1] - hand[i][1] // 2, on_screen_hand[i][0] - hand[i][1] // 2,
+                #           hand[i][1], hand[i][1])
 
-        # Paint the new hand
-        for i in range(len(hand)):
-            on_screen_hand[i] = [int(y_center + int(hand[i][1] * cos - hand[i][0] * sin)),
-                                 int(x_center + int(hand[i][0] * cos + hand[i][1] * sin))]
-            draw.fill(color, on_screen_hand[i][1], on_screen_hand[i][0], 1, 1)
+                # Redraw pixel a pixel.
+                on_screen_hand[i] = [int(y_center - int(hand[i][1] * cos - hand[i][0] * sin)),
+                                      int(x_center + int(hand[i][0] * cos + hand[i][1] * sin))]
+                # draw.fill(_bg, on_screen_hand[i][1], on_screen_hand[i][0], 1, 1)
+                buf = memoryview(display.linebuffer)[0:2*1]
+                set_window(on_screen_hand[i][1], on_screen_hand[i][0], 1, 1)
+                _fill(buf, color, 1, 0)
+                _fill(buf, _bg, 1, 0)
+                quick_write(buf)
+
+                # Another option that I don't remember.
+                # buf = memoryview(display.linebuffer)[0:2 * hand[i][1]]
+                # set_window(on_screen_hand[i][1], on_screen_hand[i][0], hand[i][1], hand[i][1])
+                # _fill(buf, _bg, hand[i][1], 0)
+                # quick_write(buf)
+
+        display.quick_end()
+        #
+        # # Paint the new hand
+        # for i in range(len(hand)):
+        #     # Formula form internet to rotate an image.
+        #     # on_screen_hand[i] = [int(y_center + int(hand[i][1] * cos - hand[i][0] * sin)),
+        #     #                      int(x_center + int(hand[i][0] * cos + hand[i][1] * sin))]
+        #     on_screen_hand[i] = [int(y_center + int(hand[i][0] * cos - 0 * sin)),
+        #                          int(x_center + int(0 * cos + hand[i][0] * sin))]
+        #     # draw.fill(color, on_screen_hand[i][1], on_screen_hand[i][0], 1, 1)
+        #     draw.fill(color, on_screen_hand[i][1]-hand[i][1]//2, on_screen_hand[i][0]-hand[i][1]//2, hand[i][1], hand[i][1])
+        #     # buf = memoryview(display.linebuffer)[0:2*1]
+        #     # buf = memoryview(display.linebuffer)[0:2 * hand[i][1]]
+        #     # set_window(on_screen_hand[i][1], on_screen_hand[i][0], 1, 1)
+        #     # set_window(on_screen_hand[i][1], on_screen_hand[i][0], hand[i][1], hand[i][1])
+        #     # _fill(buf, color, 1, 0)
+        #     # _fill(buf, _bg, hand[i][1], 0)
+        #     # quick_write(buf)
+        #
+        # for i in range(len(on_screen_hand)):
+        #     if not self._bg_image:
+        #         draw.fill(_bg, on_screen_hand[i][1] - hand[i][1] // 2, on_screen_hand[i][0] - hand[i][1] // 2,
+        #               hand[i][1], hand[i][1])
+        #     # x = mid - int(thecos) + thecos * pix
+        #     # y = mid - int(thesin) + thesin * pix
+        #     # on_screen_hand[i] = [int(y_center + int(hand[i][1] * cos - hand[i][0] * sin)),
+        #     #                      int(x_center + int(hand[i][0] * cos + hand[i][1] * sin))]
+        #     on_screen_hand[i] = [int(y_center + int(hand[i][0] * cos - 0 * sin)),
+        #                         int(x_center + int(0 * cos + hand[i][0] * sin))]
+        #     # on_screen_hand[i] = [int(y_center - int(sin) + sin * hand[i][0]),
+        #     #                      int(x_center - int(cos) + cos * hand[i][0])]
+        #     draw.fill(color, on_screen_hand[i][1] - hand[i][1] // 2, on_screen_hand[i][0] - hand[i][1] // 2,
+        #               hand[i][1],
+        #               hand[i][1])
+        #
+        #
+        #
+        #
+        # # display.quick_end()
