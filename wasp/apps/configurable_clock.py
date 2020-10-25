@@ -166,8 +166,7 @@ class ConfigurableClockApp():
         self._notifier = wasp.widgets.StatusBar()  # Add notifications bar. For example, bluetooth
         #TODO configuration can be outside of class?
         self._bg_image = True  # True to draw a background image
-        self._analog_clock = True  # True for draw analog clock
-        self._digital_clock = False  # True for draw digital clock
+        self._analog_clock = True  # True for draw analog clock. False for digital clock
         self._heart = False  # True for draw heart rate
         self._steps = False  # True for draw steps counter
         self._on_screen = (-1, -1, -1, -1, -1, -1)  # Time displayed in the screen (yyy, mm, dd, HH, MM, SS)
@@ -223,8 +222,7 @@ class ConfigurableClockApp():
         # Draw the clock
         if self._analog_clock:
             self._draw_analog_clock()
-
-        if self._digital_clock:
+        else:
             self._draw_digital_clock()
 
         # We are drawing from the start the whole screen so we need to restart _on_screen variable.
@@ -298,8 +296,7 @@ class ConfigurableClockApp():
         now = wasp.watch.rtc.get_localtime()  # Wall time formatted as (yyyy, mm, dd, HH, MM, SS, wday, yday)
         if self._analog_clock:
             self._update_analog_clock(now)
-
-        if self._digital_clock:
+        else:
             self._update_digital_clock(now)
 
         self._on_screen = now
