@@ -91,36 +91,36 @@ _second_hand_shape = [green, (0, 105, 1, 2)]  # color, (initial, final, xresolut
 #             _hand[_i] = [x, y]
 #             _i += 1
 
-
-def _hand_generator(hand_shape):
-    l_hand = 0
-    for i in hand_shape[1:]:
-        l_hand += ((i[1]-i[0])//i[2] + (i[1]-i[0]) % i[2])*i[3]
-    hand = [0]*l_hand
-    i = 0
-    for shape in hand_shape[1:]:
-        for y in range(shape[3]):
-            y = y-shape[3]//2-shape[3] % 2 + 1
-            for x in range(shape[0], shape[1], shape[2]):
-                hand[i] = [x, y]
-                i += 1
-    return hand
-
-# # TODO con el espesor en medio. A optimizar el proceso.
+# Pixel by pixel
 # def _hand_generator(hand_shape):
 #     l_hand = 0
 #     for i in hand_shape[1:]:
-#         # l_hand += ((i[1]-i[0])//i[2] + (i[1]-i[0]) % i[2])*i[3]
-#         l_hand += ((i[1] - i[0]) // i[2] + (i[1] - i[0]) % i[2])
+#         l_hand += ((i[1]-i[0])//i[2] + (i[1]-i[0]) % i[2])*i[3]
 #     hand = [0]*l_hand
 #     i = 0
 #     for shape in hand_shape[1:]:
-#         # for y in range(shape[3]):
-#         #     y = y-shape[3]//2-shape[3] % 2 + 1
-#         for x in range(shape[0], shape[1], shape[2]):
-#                 hand[i] = [x, shape[3]] # en vez las y, pongo el espesor.
+#         for y in range(shape[3]):
+#             y = y-shape[3]//2-shape[3] % 2 + 1
+#             for x in range(shape[0], shape[1], shape[2]):
+#                 hand[i] = [x, y]
 #                 i += 1
 #     return hand
+
+# TODO con el espesor en medio. A optimizar el proceso.
+def _hand_generator(hand_shape):
+    l_hand = 0
+    for i in hand_shape[1:]:
+        # l_hand += ((i[1]-i[0])//i[2] + (i[1]-i[0]) % i[2])*i[3]
+        l_hand += ((i[1] - i[0]) // i[2] + (i[1] - i[0]) % i[2])
+    hand = [0]*l_hand
+    i = 0
+    for shape in hand_shape[1:]:
+        # for y in range(shape[3]):
+        #     y = y-shape[3]//2-shape[3] % 2 + 1
+        for x in range(shape[0], shape[1], shape[2]):
+                hand[i] = [x, shape[3]] # en vez las y, pongo el espesor.
+                i += 1
+    return hand
 
 
 _hour_hand = _hand_generator(_hour_hand_shape)
@@ -165,7 +165,7 @@ class ConfigurableClockApp():
         self._meter = wasp.widgets.BatteryMeter()  # Add battery widget
         self._notifier = wasp.widgets.StatusBar()  # Add notifications bar. For example, bluetooth
         #TODO configuration can be outside of class?
-        self._bg_image = True  # True to draw a background image
+        self._bg_image = False  # True to draw a background image
         self._analog_clock = True  # True for draw analog clock. False for digital clock
         self._heart = False  # True for draw heart rate
         self._steps = False  # True for draw steps counter
@@ -316,11 +316,8 @@ class ConfigurableClockApp():
             self._update_hand(now[5], 60, 120, 120, _second_hand, self._old_hand_second, _second_hand_shape[0])
         if now[4] != self._on_screen[4] or self._on_screen[5] == self._on_screen[4]:
             self._update_hand(now[4], 60, 120, 120, _minute_hand, self._old_hand_minutes, _minuter_hand_shape[0])
-        # draw = wasp.watch.drawable
-        # draw.fill(_bg, 120, 60+now[5]-1, 120,5)
-        # draw.fill( _hour_hand_shape[0], 120, 60 + now[5], 120, 15)
         endtime = time.process_time()
-        print(endtime-starttime)
+        print(10*(endtime-starttime))
 
     def _update_digital_clock(self, now):
         # TODO Add support for background image
@@ -351,10 +348,13 @@ class ConfigurableClockApp():
         cos = math.cos(math.radians(angle))
         sin = math.sin(math.radians(angle))
 
-        # Erase the old hand
+        # # Erase the old hand
         if self._bg_image:
+            # TODO unsuported at present
+            # TODO, se debe optimizar. demasiada lenta.
             draw.redraw_blit(_bg_image, on_screen_hand)
             # Paint the new hand
+            display.quick_start()
             for i in range(len(hand)):
                 # Redraw from the middle. I don't like how it's displayed.
                 # on_screen_hand[i] = [y_center + int(hand[i][0] * sin),
@@ -372,35 +372,63 @@ class ConfigurableClockApp():
                 quick_write(buf)
 
         else:
+            display.quick_start()
+            # buf_c = memoryview(display.linebuffer)[0:2 * 1]
+            buf_c = memoryview(display.linebuffer)[0:2 * 2] #TODO harcoded
+
+            # _fill(buf_c, color, 1, 0) Los _fill deben estar despues del set_windows :(
+
+            # buf_bg = memoryview(display.linebuffer)[0:2 * 1]
+            buf_bg = memoryview(display.linebuffer)[0:2 * 2] #TODO harcoded
+
+            # _fill(buf_bg, _bg, 1, 0)
+
             for i in range(len(on_screen_hand)):
                 # Redraw from the middle. I don't like how it's displayed.
                 # Don't work well with background image and hand drawn from the middle. On_screen_hand don't have all
                 # pixels
-                # on_screen_hand[i] = [y_center + int(hand[i][0] * sin),
-                #                      x_center + int(hand[i][0] * cos)]
-                # draw.fill(_bg, on_screen_hand[i][1]-hand[i][1]//2, on_screen_hand[i][0]-hand[i][1]//2, hand[i][1],
-                #           hand[i][1])
-                # draw.fill(color, on_screen_hand[i][1] - hand[i][1] // 2, on_screen_hand[i][0] - hand[i][1] // 2,
-                #           hand[i][1], hand[i][1])
+                draw.fill(_bg, on_screen_hand[i][1] - hand[i][1] // 2, on_screen_hand[i][0] - hand[i][1] // 2,
+                          hand[i][1],
+                          hand[i][1])
+                # set_window(on_screen_hand[i][1] - hand[i][1] // 2, on_screen_hand[i][0] - hand[i][1] // 2, hand[i][1],
+                #            hand[i][1])
+                # _fill(buf_bg, _bg, 2, 0) #TODO harcoded
+                # quick_write(buf_bg)
 
-                # Redraw pixel a pixel.
-                on_screen_hand[i] = [int(y_center - int(hand[i][1] * cos - hand[i][0] * sin)),
-                                      int(x_center + int(hand[i][0] * cos + hand[i][1] * sin))]
-                # draw.fill(_bg, on_screen_hand[i][1], on_screen_hand[i][0], 1, 1)
-                buf = memoryview(display.linebuffer)[0:2*1]
-                set_window(on_screen_hand[i][1], on_screen_hand[i][0], 1, 1)
-                _fill(buf, color, 1, 0)
-                _fill(buf, _bg, 1, 0)
-                quick_write(buf)
+                on_screen_hand[i] = [y_center + int(hand[i][0] * sin),
+                                     x_center + int(hand[i][0] * cos)]
 
-                # Another option that I don't remember.
-                # buf = memoryview(display.linebuffer)[0:2 * hand[i][1]]
-                # set_window(on_screen_hand[i][1], on_screen_hand[i][0], hand[i][1], hand[i][1])
-                # _fill(buf, _bg, hand[i][1], 0)
-                # quick_write(buf)
+                draw.fill(color, on_screen_hand[i][1] - hand[i][1] // 2, on_screen_hand[i][0] - hand[i][1] // 2,
+                          hand[i][1], hand[i][1])
+                # set_window(on_screen_hand[i][1] - hand[i][1] // 2, on_screen_hand[i][0] - hand[i][1] // 2, hand[i][1],
+                #            hand[i][1])
+                # _fill(buf_c, color, 2, 0)  # TODO harcoded
+                # quick_write(buf_c)
+                # # Redraw pixel a pixel.
+                # # Erase old hand
+                # # buf = memoryview(display.linebuffer)[0:2 * 1]
+                # set_window(on_screen_hand[i][1], on_screen_hand[i][0], 1, 1)
+                # _fill(buf_bg, _bg, 1, 0)
+                # quick_write(buf_bg)
+                # # Paint new hand
+                # on_screen_hand[i] = [int(y_center - int(hand[i][1] * cos - hand[i][0] * sin)),
+                #                       int(x_center + int(hand[i][0] * cos + hand[i][1] * sin))]
+                # # draw.fill(_bg, on_screen_hand[i][1], on_screen_hand[i][0], 1, 1)
+                # # buf = memoryview(display.linebuffer)[0:2*1]
+                # set_window(on_screen_hand[i][1], on_screen_hand[i][0], 1, 1)
+                # _fill(buf_c, color, 1, 0)
+                # # quick_write(buf)
+                # quick_write(buf_c)
+                #
+                # # Another option that I don't remember.
+                # # buf = memoryview(display.linebuffer)[0:2 * hand[i][1]]
+                # # set_window(on_screen_hand[i][1], on_screen_hand[i][0], hand[i][1], hand[i][1])
+                # # _fill(buf, _bg, hand[i][1], 0)
+                # # quick_write(buf)
 
         display.quick_end()
-        #
+
+        # #
         # # Paint the new hand
         # for i in range(len(hand)):
         #     # Formula form internet to rotate an image.
