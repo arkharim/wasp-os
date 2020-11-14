@@ -250,8 +250,7 @@ class AnalogWikiClock():
         # print("p2x ", p2x)
         # print("p1y ", p1y)
         # print("p2y ", p2y)
-        self.plotLine(color, p1x, p1y, p2x, p2y, 2) # Width = 2
-        # self.plotLineWidth(color, p1x, p1y, p2x, p2y, 2) # solo si w > 1
+        self.plotLine(color, p1x, p1y, p2x, p2y, 2) # TODO Width = 2
 
     """Es el que consigo dibujar mejor el reloj"""
     """el peor caso son los 45º, revisar si se puede mejorar de alguna manera el fill."""
@@ -283,10 +282,7 @@ class AnalogWikiClock():
 
         wx = 1
         for x in range(x0, x1):
-            # draw.fill(color, x, y, 1, 1)
             if D > 0:
-                # draw.fill(color, x-wx+1, y, wx, 1)
-                # draw.fill(color, x-wx+1 - wd // 2, y - wd // 2, wx, wd)
                 draw.fill(color, x-wx+1 - wd // 2, y, wx, wd)
 
                 wx = 1
@@ -313,14 +309,11 @@ class AnalogWikiClock():
         for y in range(y0, y1):
             # draw.fill(color, x, y, 1, 1)
             if D > 0:
-                # draw.fill(color, x, y-wy+1, 1, wy)
-                # draw.fill(color, x - wd // 2, y - wy+1 - wd // 2, wd, wy)
                 draw.fill(color, x - wd // 2, y - wy+1, wd, wy)
                 wy = 1
                 x = x + xi
                 D = D + (2 * (dx - dy))
             else:
-                wy +=1
+                wy += 1
                 D = D + 2*dx
-        # draw.fill(color, x, y1-wy+1- wd // 2, wd, wy)
         draw.fill(color, x - wd // 2, y1-wy+1, wd, wy)
