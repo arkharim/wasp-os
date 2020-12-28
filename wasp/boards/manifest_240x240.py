@@ -3,17 +3,20 @@
 """Shared manifest for applications that work well on a 240x240 display."""
 
 manifest = (
+    'apps/alarm.py',
     'apps/clock.py',
     'apps/flashlight.py',
     'apps/gameoflife.py',
     'apps/haiku.py',
     'apps/heart.py',
+    'apps/musicplayer.py',
     'apps/launcher.py',
     'apps/pager.py',
     'apps/settings.py',
     'apps/steps.py',
     'apps/stopwatch.py',
     'apps/fibonacci_clock.py',
+    'apps/snake.py',
     'apps/testapp.py',
     'fonts/__init__.py',
     'fonts/clock.py',

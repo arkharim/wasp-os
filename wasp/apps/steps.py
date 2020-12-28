@@ -42,18 +42,41 @@ class StepCounterApp():
 
     def __init__(self):
         watch.accel.reset()
-        self._meter = wasp.widgets.BatteryMeter()
         self._count = 0
-        self._last_clock = ( -1, -1, -1, -1, -1, -1 )
+        self._wake = 0
 
     def foreground(self):
-        """Activate the application."""
-        # Force a redraw (without forgetting the current date)
-        lc = self._last_clock
-        self._last_clock = (lc[0], lc[1], lc[2], -1, -1, -1)
+        """Cancel the alarm and draw the application.
 
+        Cancelling the alarm has two effects. Firstly it ensures the
+        step count won't change whilst we are watching it and, secondly
+        it ensures that if the time of day has been set to a value in
+        the past the we reconfigure the alarm.
+
+        This does in the side effect that if the application of open at
+        midnight then the reset doesn't happen for that day.
+        """
+        wasp.system.cancel_alarm(self._wake, self._reset)
+        wasp.system.bar.clock = True
         self._draw()
         wasp.system.request_tick(1000)
+
+    def background(self):
+        """Set an alarm to trigger at midnight and reset the counter."""
+        now = watch.rtc.get_localtime()
+        yyyy = now[0]
+        mm = now[1]
+        dd = now[2]
+        then = (yyyy, mm, dd+1, 0, 0, 0, 0, 0, 0)
+
+        self._wake = time.mktime(then)
+        wasp.system.set_alarm(self._wake, self._reset)
+
+    def _reset(self):
+        """"Reset the step counter and re-arm the alarm."""
+        watch.accel.steps = 0
+        self._wake += 24 * 60 * 60
+        wasp.system.set_alarm(self._wake, self._reset)
 
     def tick(self, ticks):
         self._count += 686;
@@ -65,28 +88,16 @@ class StepCounterApp():
         draw.fill()
         draw.blit(feet, 12, 132-24)
 
-        self._last_count = -1
         self._update()
-        self._meter.draw()
+        wasp.system.bar.draw()
 
     def _update(self):
         draw = wasp.watch.drawable
 
-        # Lazy update of the clock and battery meter
-        now = wasp.watch.rtc.get_localtime()
-        if now[4] != self._last_clock[4]:
-            t1 = '{:02}:{:02}'.format(now[3], now[4])
-            draw.set_font(fonts.sans28)
-            draw.set_color(0x7bef)
-            draw.string(t1, 48, 12, 240-96)
+        # Update the status bar
+        now = wasp.system.bar.update()
 
-            if now[2] != self._last_clock[2]:
-                watch.accel.steps = 0
-                draw.fill(0, 60, 132-18, 180, 36)
-
-            self._last_clock = now
-            self._meter.update()
-
+        # Update the step count
         count = watch.accel.steps
         t = str(count)
         w = fonts.width(fonts.sans36, t)

@@ -82,18 +82,51 @@ class NotificationApp(PagerApp):
 
     def __init__(self):
         super().__init__('')
+        self.confirmation_view = wasp.widgets.ConfirmationView()
 
     def foreground(self):
         notes = wasp.system.notifications
-
-        id = next(iter(notes))
-        note = notes[id]
-        del notes[id]
+        note = notes.pop(next(iter(notes)))
         title = note['title'] if 'title' in note else 'Untitled'
         body = note['body'] if 'body' in note else ''
         self._msg = '{}\n\n{}'.format(title, body)
 
+        wasp.system.request_event(wasp.EventMask.TOUCH)
         super().foreground()
+
+    def background(self):
+        self.confirmation_view.active = False
+        super().background()
+
+    def swipe(self, event):
+        if self.confirmation_view.active:
+            if event[0] == wasp.EventType.UP:
+                self.confirmation_view.active = False
+                self._draw()
+                return
+        else:
+            if event[0] == wasp.EventType.DOWN and self._page == 0:
+                self.confirmation_view.active = True
+                self._draw()
+                return
+
+        super().swipe(event)
+
+    def _draw(self):
+        if self.confirmation_view.active:
+            self.confirmation_view.draw('Clear notifications?')
+        else:
+            super()._draw()
+
+    def touch(self, event):
+        if self.confirmation_view.active:
+            is_confirmed = self.confirmation_view.touch(event)
+            if is_confirmed:
+                wasp.system.notifications = {}
+                wasp.system.navigate(wasp.EventType.BACK)
+            elif is_confirmed != None:
+                self._draw()
+
 
 class CrashApp():
     """Crash handler application.

@@ -3,6 +3,9 @@
 
 """ Simulated ST7789 display and CST816S touchscreen. """
 
+import warnings
+warnings.simplefilter("ignore", lineno=58)
+
 import sys
 import sdl2
 import sdl2.ext
@@ -34,6 +37,11 @@ class ST7789Sim(object):
         self.cmd = 0
 
     def write(self, data):
+        # Converting data to a memoryview ensures we act more like spi.write()
+        # when running in a real device (e.g. data must be  bytes-like object
+        # that implements the buffer protocol)
+        data = memoryview(data)
+
         if len(data) == 1:
             # Assume if we get a byte at a time then it is command.
             # This is a simplification do we don't have to track
@@ -163,6 +171,29 @@ class CST816SSim():
 
         self.regs[4] = up_x;
         self.regs[6] = up_y;
+        self.raise_interrupt(pins)
+
+    def press(self, x, y):
+        pins = wasp.watch.Pin.pins
+        self.regs[1] = 5
+        self.regs[4] = x
+        self.regs[6] = y
+        self.raise_interrupt(pins)
+
+    def swipe(self, direction):
+        pins = wasp.watch.Pin.pins
+        if direction ==' up':
+            self.regs[1] = 1
+        elif direction == 'down':
+            self.regs[1] = 2
+        elif direction == 'left':
+            self.regs[1] = 4
+        elif direction == 'right':
+            self.regs[1] = 3
+        elif direction == 'next':
+            # Allow NEXT to be tested on the simulator
+            self.regs[1] = 253
+        self.regs[3] = 0x80
         self.raise_interrupt(pins)
 
     def raise_interrupt(self, pins):

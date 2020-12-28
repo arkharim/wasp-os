@@ -7,6 +7,7 @@
 
 import array
 import fonts.sans24
+import math
 import micropython
 
 @micropython.viper
@@ -731,3 +732,92 @@ class Draw565(object):
 #     # display.quick_end()
 #
 #     # return 0x005F #sirve?
+
+    def line(self, x0, y0, x1, y1, width=1, color=None):
+        """Draw a line between points (x0, y0) and (x1, y1).
+
+        Example:
+
+        .. code-block:: python
+
+            draw = wasp.watch.drawable
+            draw.line(0, 120, 240, 240, 0xf800)
+
+        :param x0: X coordinate of the start of the line
+        :param y0: Y coordinate of the start of the line
+        :param x1: X coordinate of the end of the line
+        :param y1: Y coordinate of the end of the line
+        :param width: Width of the line in pixels
+        :param color: Colour to draw line, defaults to the foreground colour
+        """
+        if color is None:
+            color = self._bgfg & 0xffff
+        px = bytes(((color >> 8) & 0xFF, color & 0xFF)) * (width * width)
+        write_data = self._display.write_data
+        set_window = self._display.set_window
+
+        dw = (width - 1) // 2
+        x0 -= dw
+        y0 -= dw
+        x1 -= dw
+        y1 -= dw
+
+        dx =  abs(x1 - x0)
+        sx = 1 if x0 < x1 else -1
+        dy = -abs(y1 - y0)
+        sy = 1 if y0 < y1 else -1
+        err = dx + dy
+        if dx == 0 or dy == 0:
+            if x1 < x0 or y1 < y0:
+                x0, x1 = x1, x0
+                y0, y1 = y1, y0
+            w = width if dx == 0 else (dx + width - 1)
+            h = width if dy == 0 else (-dy + width - 1)
+            self.fill(color, x0, y0, w, h)
+            return
+        while True:
+            set_window(x0, y0, width, width)
+            write_data(px)
+            if x0 == x1 and y0 == y1:
+                break
+            e2 = 2 * err
+            if e2 >= dy:
+                err += dy
+                x0 += sx
+            if e2 <= dx:
+                err += dx;
+                y0 += sy;
+
+    def polar(self, x, y, theta, r0, r1, width=1, color=None):
+        """Draw a line using polar coordinates.
+
+        The coordinate system is tuned for clock applications so it
+        adopts navigational conventions rather than mathematical ones.
+        Specifically the reference direction is drawn vertically
+        upwards and the angle is measures clockwise in degrees.
+
+        Example:
+
+        .. code-block:: python
+
+            draw = wasp.watch.drawable
+            draw.line(360 / 12, 16, 64)
+
+        :param theta: Angle, in degrees
+        :param r0: Radius of the start of the line
+        :param y0: Radius of the end of the line
+        :param x: X coordinate of the origin
+        :param y: Y coordinate of the origin
+        :param width: Width of the line in pixels
+        :param color: Colour to draw line in, defaults to the foreground colour
+        """
+        to_radians = math.pi / 180
+        xdelta = math.sin(theta * to_radians)
+        ydelta = math.cos(theta * to_radians)
+
+        x0 = x + int(xdelta * r0)
+        x1 = x + int(xdelta * r1)
+        y0 = y - int(ydelta * r0)
+        y1 = y - int(ydelta * r1)
+
+        self.line(x0, y0, x1, y1, width, color)

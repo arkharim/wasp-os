@@ -8,9 +8,11 @@ The widget library allows common fragments of logic and drawing code to be
 shared between applications.
 """
 
+import fonts
 import icons
 import wasp
 import watch
+
 from micropython import const
 
 class BatteryMeter:
@@ -37,69 +39,152 @@ class BatteryMeter:
 
         if watch.battery.charging():
             if self.level != -1:
-                draw.rleblit(icon, pos=(239-icon[0], 0), fg=0x7bef)
+                draw.blit(icon, 239-icon[1], 0,
+                             fg=wasp.system.theme('battery'))
                 self.level = -1
         else:
             level = watch.battery.level()
             if level == self.level:
                 return
 
-            if level > 96:
-                h = 24
-                rgb = 0x07e0
-            else:
-                h = level // 4
 
-                green = level // 3
-                red = 31-green
-                rgb = (red << 11) + (green << 6)
+            green = level // 3
+            if green > 31:
+                green = 31
+            red = 31-green
+            rgb = (red << 11) + (green << 6)
 
-            if (level > 5) ^ (self.level > 5):
+            if self.level < 0 or ((level > 5) ^ (self.level > 5)):
                 if level  > 5:
-                    draw.rleblit(icon, pos=(239-icon[0], 0), fg=0x7bef)
+                    draw.blit(icon, 239-icon[1], 0,
+                             fg=wasp.system.theme('battery'))
                 else:
                     rgb = 0xf800
-                    draw.rleblit(icon, pos=(239-icon[0], 0), fg=0xf800)
+                    draw.blit(icon, 239-icon[1], 0, fg=0xf800)
 
-            x = 239 - 30
-            w = 16
-            if 24 - h:
-                draw.fill(0, x, 14, w, 24 - h)
+            w = icon[1] - 10
+            x = 239 - 5 - w
+            h = 2*level // 11
+            if 18 - h:
+                draw.fill(0, x, 9, w, 18 - h)
             if h:
-                draw.fill(rgb, x, 38 - h, w, h)
+                draw.fill(rgb, x, 27 - h, w, h)
 
             self.level = level
 
-class StatusBar:
+class Clock:
+    """Small clock widget."""
+    def __init__(self, enabled=True):
+        self.on_screen = None
+        self.enabled = enabled
+
+    def draw(self):
+        """Redraw the clock from scratch.
+
+        The container is required to clear the canvas prior to the redraw
+        and the clock is only drawn if it is enabled.
+        """
+        self.on_screen = None
+        self.update()
+
+    def update(self):
+        """Update the clock widget if needed.
+
+        This is a lazy update that only redraws if the time has changes
+        since the last call *and* the clock is enabled.
+
+        :returns: An time tuple if the time has changed since the last call,
+                  None otherwise.
+        """
+        now = wasp.watch.rtc.get_localtime()
+        on_screen = self.on_screen
+
+        if on_screen and on_screen == now:
+            return None
+
+        if self.enabled and (not on_screen
+                or now[4] != on_screen[4] or now[3] != on_screen[3]):
+            t1 = '{:02}:{:02}'.format(now[3], now[4])
+
+            draw = wasp.watch.drawable
+            draw.set_font(fonts.sans28)
+            draw.set_color(wasp.system.theme('status-clock'))
+            draw.string(t1, 52, 4, 138)
+
+        self.on_screen = now
+        return now
+
+class NotificationBar:
     """Show BT status and if there are pending notifications."""
-    def __init__(self, x=8, y=8):
+    def __init__(self, x=0, y=0):
         self._pos = (x, y)
 
     def draw(self):
-        """Update the notification widget.
+        """Redraw the notification widget.
 
         For this simple widget :py:meth:`~.draw` is simply a synonym for
-        :py:meth:`~.update`.
+        :py:meth:`~.update` because we unconditionally update from scratch.
         """
         self.update()
 
     def update(self):
         """Update the widget.
+
+        This widget does not implement lazy redraw internally since this
+        can often be implemented (with less state) by the container.
         """
         draw = watch.drawable
         (x, y) = self._pos
 
         if wasp.watch.connected():
-            draw.blit(icons.blestatus, x, y, fg=0x7bef)
+            draw.blit(icons.blestatus, x, y, fg=wasp.system.theme('ble'))
             if wasp.system.notifications:
-                draw.blit(icons.notification, x+24, y, fg=0x7bef)
+                draw.blit(icons.notification, x+22, y,
+                          fg=wasp.system.theme('notify-icon'))
             else:
-                draw.fill(0, x+24, y, 32, 32)
+                draw.fill(0, x+22, y, 30, 32)
         elif wasp.system.notifications:
-            draw.blit(icons.notification, x, y, fg=0x7bef)
-            draw.fill(0, x+32, y, 32, 32)
+            draw.blit(icons.notification, x, y,
+                      fg=wasp.system.theme('notify-icon'))
+            draw.fill(0, x+30, y, 22, 32)
         else:
-            draw.fill(0, x, y, 56, 32)
+            draw.fill(0, x, y, 52, 32)
+
+class StatusBar:
+    """Combo widget to handle notification, time and battery level."""
+    def __init__(self):
+        self._clock = Clock()
+        self._meter = BatteryMeter()
+        self._notif = NotificationBar()
+
+    @property
+    def clock(self):
+        """True if the clock should be included in the status bar, False
+        otherwise.
+        """
+        return self._clock.enabled
+
+    @clock.setter
+    def clock(self, enabled):
+        self._clock.enabled = enabled
+
+    def draw(self):
+        """Redraw the status bar from scratch."""
+        self._clock.draw()
+        self._meter.draw()
+        self._notif.draw()
+
+    def update(self):
+        """Lazily update the status bar.
+
+        :returns: An time tuple if the time has changed since the last call,
+                  None otherwise.
+        """
+        now = self._clock.update()
+        if now:
+            self._meter.update()
+            self._notif.update()
+        return now
 
 class ScrollIndicator:
     """Scrolling indicator.
@@ -123,10 +208,12 @@ class ScrollIndicator:
     def update(self):
         """Update from scrolling indicator."""
         draw = watch.drawable
+        color = wasp.system.theme('scroll-indicator')
+
         if self.up:
-            draw.rleblit(icons.up_arrow, pos=self._pos, fg=0x7bef)
+            draw.blit(icons.up_arrow, self._pos[0], self._pos[1], fg=color)
         if self.down:
-            draw.rleblit(icons.down_arrow, pos=(self._pos[0], self._pos[1] + 13), fg=0x7bef)
+            draw.blit(icons.down_arrow, self._pos[0], self._pos[1]+13, fg=color)
 
 _SLIDER_KNOB_DIAMETER = const(40)
 _SLIDER_KNOB_RADIUS = const(_SLIDER_KNOB_DIAMETER // 2)
@@ -138,22 +225,14 @@ _SLIDER_TRACK_Y2 = const(_SLIDER_TRACK_Y1 + _SLIDER_TRACK_HEIGHT)
 
 class Slider():
     """A slider to select values."""
-    def __init__(self, steps, x=10, y=90, color=0x39ff):
+    def __init__(self, steps, x=10, y=90, color=None):
         self.value = 0
         self._steps = steps
         self._stepsize = _SLIDER_TRACK / (steps-1)
         self._x = x
         self._y = y
         self._color = color
-
-        # Automatically generate a lowlight color
-        if color < 0b10110_000000_00000:
-            color = (color | 0b10110_000000_00000) & 0b10110_111111_11111
-        if (color & 0b111111_00000) < 0b101100_00000:
-            color = (color | 0b101100_00000) & 0b11111_101100_11111
-        if (color & 0b11111) < 0b10110:
-            color = (color | 0b11000) & 0b11111_111111_10110
-        self._lowlight = color
+        self._lowlight = None
 
     def draw(self):
         """Draw the slider."""
@@ -161,6 +240,19 @@ class Slider():
         x = self._x
         y = self._y
         color = self._color
+        if self._color is None:
+            self._color = wasp.system.theme('slider-default')
+            color = self._color
+        if self._lowlight is None:
+            # Automatically generate a lowlight color
+            if color < 0b10110_000000_00000:
+                color = (color | 0b10110_000000_00000) & 0b10110_111111_11111
+            if (color & 0b111111_00000) < 0b101100_00000:
+                color = (color | 0b101100_00000) & 0b11111_101100_11111
+            if (color & 0b11111) < 0b10110:
+                color = (color | 0b11000) & 0b11111_111111_10110
+            self._lowlight = color
+            color = self._color
         light = self._lowlight
 
         knob_x = x + ((_SLIDER_TRACK * self.value) // (self._steps-1))
@@ -203,3 +295,78 @@ class Slider():
         elif v >= self._steps:
             v = self._steps - 1
         self.value = v
+
+
+_message_string_x_coord = const(0)
+_message_string_y_coord = const(60)
+_yes_button_x_coord = const(20)
+_yes_button_y_coord = const(100)
+_no_button_x_coord = const(120)
+_no_button_y_coord = const(100)
+
+class ConfirmationView:
+    "Confirmation widget allowing user confirmation of a setting"
+
+    def __init__(self):
+        self.active = False
+
+        self.yes_button_bounds = (
+            (_yes_button_x_coord, _yes_button_y_coord),
+            (
+                icons.yes_button[0] + _yes_button_x_coord,
+                icons.yes_button[1] + _yes_button_y_coord,
+            ),
+        )
+        self.no_button_bounds = (
+            (_no_button_x_coord, _no_button_y_coord),
+            (
+                icons.no_button[0] + _no_button_x_coord,
+                icons.no_button[1] + _no_button_y_coord,
+            )
+        )
+
+    def draw(self, message):
+        wasp.watch.drawable.fill(1)
+        wasp.watch.drawable.string(
+            message,
+            _message_string_x_coord,
+            _message_string_y_coord
+        )
+        wasp.watch.drawable.blit(
+            icons.yes_button,
+            _yes_button_x_coord,
+            _yes_button_y_coord,
+        )
+        wasp.watch.drawable.blit(
+            icons.no_button,
+            _no_button_x_coord,
+            _no_button_y_coord,
+        )
+        self.active = True
+
+
+    def touch(self, event):
+        x_coord = event[1]
+        y_coord = event[2]
+        is_yes_button_press = (
+            x_coord > self.yes_button_bounds[0][0]
+            and y_coord > self.yes_button_bounds[0][1]
+            and x_coord < self.yes_button_bounds[1][0]
+            and y_coord < self.yes_button_bounds[1][1]
+        )
+
+        is_no_button_press = (
+            x_coord > self.no_button_bounds[0][0]
+            and y_coord > self.no_button_bounds[0][1]
+            and x_coord < self.no_button_bounds[1][0]
+            and y_coord < self.no_button_bounds[1][1]
+        )
+
+        if is_yes_button_press:
+            self.active = False
+            return True
+        elif is_no_button_press:
+            self.active = False
+            return False
+        else:
+            return None

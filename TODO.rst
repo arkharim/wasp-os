@@ -11,9 +11,7 @@ Roadmap
 --------------------------------
 
 For 0.4 we focus on improving the watch/phone integration whilst also taking steps
-to improve the general fit and finish. In addition the reloader will be extended
-to ensure we retain the capability to install wasp-os over-the-air on newer
-PineTime models.
+to improve the general fit and finish.
 
 Bootloader
 ~~~~~~~~~~
@@ -21,32 +19,37 @@ Bootloader
 * [ ] Stay in bootloader after battery run down
 * [ ] Implement power off support (no splash screen)
 
-Reloader
-~~~~~~~~
-
-* [ ] Board identity check
-* [ ] UICR update support
-* [ ] Improve linker map (everything except linker table at +256K)
-* [ ] mcuboot
-
-  * [ ] Reconfigurable entry point (allow reloader to run from mcuboot)
-  * [ ] Allow reloader to install mcuboot and flash app (from wasp-bootloader)
-  * [ ] Allow reloader to install wasp-os (from mcuboot)
-
 Micropython
 ~~~~~~~~~~~
 
 * [ ] Use SoftDevice sleep logic
-* [ ] Automatically enter SPI flash power saving mode
 
 Wasp-os
 ~~~~~~~
 
-* [ ] Watch/phone integration
+* [X] Watch/phone integration with GadgetBridge
 
-  * [ ] Music player support
-  * [ ] Set date/time
-  * [ ] Fully fledged wasp-os device class
+  * [X] Set date/time
+  * [X] Fully fledged wasp-os device class
+
+* [ ] Look and feel
+
+  * [X] Add a simple theming approach
+  * [ ] Update icon for Music player
+  * [ ] Introduce fwd/back/vol+/vol- buttons to the music player
+  * [ ] Update icon for Alarm app
+  * [ ] Update art work for buttons in Confirmation view
+  * [X] Reduce the size of the battery charge icon slightly (match bell)
+
+* [ ] Applications
+
+  * [X] Introduce an analog watch face
+  * [ ] Add a sports/activity app (combined stopwatch and trip counter)
+
+wasptool
+~~~~~~~~
+
+* [ ] Integrate a more powerful minifier into the wasptool paste() method
 
 0.3 (a.k.a. M3): Smartwatch
 ---------------------------
@@ -59,6 +62,14 @@ Reloader
 
 * [X] Pre-flash image verification
 * [X] Post-flash image verification
+* [X] Board identity check
+* [X] UICR update support
+* [X] Improve linker map (everything except linker table at +256K)
+* [X] mcuboot
+
+  * [X] Reconfigurable entry point (allow reloader to run from mcuboot)
+  * [X] Allow reloader to install mcuboot and flash app (from wasp-bootloader)
+  * [X] Allow reloader to install wasp-os (from mcuboot)
 
 Wasp-os
 ~~~~~~~
@@ -81,10 +92,12 @@ Wasp-os
   * [X] BMA421 driver
   * [X] Step counter app
 
-* [ ] Documentation
+* [X] Automatically enter SPI flash power saving mode
+
+* [X] Documentation
 
   * [X] Contributors guide (and code of conduct)
-  * [ ] Debugging and troubleshooting guide
+  * [X] Debugging and troubleshooting guide
   * [X] Screenshots for bootloader and all applications
   * [X] Improve the install guide
 

@@ -12,8 +12,9 @@ def print_exception(exc, file=sys.stdout):
     traceback.print_exception(exc_type, exc_value, exc_traceback, file=file)
 sys.print_exception = print_exception
 
-import draw565
 import array
+import draw565
+import os
 
 from machine import I2C
 from machine import Pin
@@ -63,7 +64,7 @@ class Backlight(object):
 
 class Battery(object):
     def __init__(self):
-        self.voltage = 3.9
+        self.voltage = 4.1
         self.step = -0.01
         self.powered = False
 
@@ -116,6 +117,9 @@ class RTC(object):
     def get_time(self):
         now = self.get_localtime()
         return (now[3], now[4], now[5])
+
+    def time(self):
+        return time.time()
 
     @property
     def uptime(self):
@@ -184,3 +188,6 @@ vibrator = Vibrator(Pin('MOTOR', Pin.OUT, value=0), active_low=True)
 
 def connected():
     return not (int(rtc.uptime / 30) & 1)
+
+# Free memory cannot be measured on the simulator
+free = 0
