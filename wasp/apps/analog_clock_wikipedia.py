@@ -242,10 +242,10 @@ class AnalogWikiClock():
         cos = math.cos(math.radians(angle))
         sin = math.sin(math.radians(angle))
 
-        p1x = x_center - _second_hand_shape[1][0]
-        p2x = x_center + int(_second_hand_shape[1][1] * cos)
-        p1y = y_center + _second_hand_shape[1][0]
-        p2y = y_center - int(_second_hand_shape[1][1] * sin)
+        p1x = bytes(x_center - _second_hand_shape[1][0])
+        p2x = bytes(x_center + int(_second_hand_shape[1][1] * cos))
+        p1y = bytes(y_center + _second_hand_shape[1][0])
+        p2y = bytes(y_center - int(_second_hand_shape[1][1] * sin))
         # print("p1x ", p1x)
         # print("p2x ", p2x)
         # print("p1y ", p1y)

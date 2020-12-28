@@ -212,7 +212,12 @@ class AnalogClock():
 
         #TODO currently only second hand works
         if self._on_screen[5] != now[5]:
-            self._update_hand(now[5], 60, 120, 120, _second_hand, self._old_hand_second, _second_hand_shape[0])
+            # self._update_hand(now[5], 60, 120, 120, _second_hand, self._old_hand_second, _second_hand_shape[0])
+            # Erase old hand
+            self._update_hand_bresenham(now[5]-1, 60, 120, 120, _second_hand, self._old_hand_second, black)
+            # Draw new hand
+            self._update_hand_bresenham(now[5], 60, 120, 120, _second_hand, self._old_hand_second, _second_hand_shape[0])
+
         # if now[4] != self._on_screen[4] or self._on_screen[5] == self._on_screen[4]:
         #     self._update_hand(now[4], 60, 120, 120, _minute_hand, self._old_hand_minutes, _minuter_hand_shape[0])
 
@@ -220,30 +225,505 @@ class AnalogClock():
         print(10*(endtime-starttime))
 
     def _update_hand(self, time, dial_number, x_center, y_center, hand, on_screen_hand, color):
-
+        #TODO harcodeado con el _second_hand_shape
         # TODO need to be optimized. Use a buffer with all modifications before to update the screen.
         draw = wasp.watch.drawable
         display = draw._display
         quick_write = display.quick_write
         set_window = display.set_window
         _fill = draw565._fill
-        angle = 360/dial_number * time - 90
+        # angle = -90 - 360/dial_number * time # 90º to rotate. Negative angles for the correct rotation
+        angle = 90 - 360/dial_number * time # 90º to rotate. Negative angles for the correct rotation
+
         cos = math.cos(math.radians(angle))
         sin = math.sin(math.radians(angle))
+        tan = math.tan(math.radians(angle))
 
         # TODO support background image
         # TODO use fill instead of _fill. See configurable clock. Performance is very similar.
+        # _second_hand_shape = [green, (0, 105, 1, 2)]  # color, (initial, final, xresolution, width)
 
-        for i in range(len(on_screen_hand)):
-            # Erase old hand
-            # Don't work well with background image and hand drawn from the middle. On_screen_hand don't have all
-            # pixels
-            draw.fill(_bg, on_screen_hand[i][1] - hand[i][1] // 2, on_screen_hand[i][0] - hand[i][1] // 2,
-                      hand[i][1],
-                      hand[i][1])
-            # Calculated the new hand
-            on_screen_hand[i] = [y_center + int(hand[i][0] * sin),
-                                 x_center + int(hand[i][0] * cos)]
-            # Paint the new hand
-            draw.fill(color, on_screen_hand[i][1] - hand[i][1] // 2, on_screen_hand[i][0] - hand[i][1] // 2,
-                      hand[i][1], hand[i][1])
+        # p1x = x_center + _second_hand_shape[1][0]
+        # p2x = x_center - int(_second_hand_shape[1][1] * cos)
+        # p1y = y_center + _second_hand_shape[1][0]
+        # p2y = y_center + int(_second_hand_shape[1][1] * sin)
+
+        #px/py bien calciulados.
+        p1x = x_center - _second_hand_shape[1][0]
+        p2x = x_center + int(_second_hand_shape[1][1] * cos)
+        p1y = y_center + _second_hand_shape[1][0]
+        p2y = y_center - int(_second_hand_shape[1][1] * sin)
+        # TODO suport xresolution
+
+
+
+        print("time ", time)
+        print("angel ", angle)
+        # print(sin)
+        # print(cos)
+        # print(tan)
+
+        if angle == 0 or angle == -90 or angle == -180 or angle == -270 or angle == -360:
+            # Para que el range funcione de una valor pequeño a uno grande.
+            ytop = min(p1y, p2y)
+            ybottom = max(p1y, p2y)
+            xleft = min(p1x, p2x)
+            xright = max(p1x, p2x)
+            draw.fill(color, xleft, ytop, max(xright-xleft, _second_hand_shape[1][3]), max(ybottom-ytop, _second_hand_shape[1][3]))
+        else:
+            # # Draw region1
+            # # h = int(_second_hand_shape[1][3])
+            # hp = _second_hand_shape[1][3]/2*cos #Creo que la anterior h era incorrecta igualmente. 0.669
+            # # hp = h
+            # # w = max(int(h * sin), 1)
+            # w = max(int(_second_hand_shape[1][3]/2*sin + hp/tan), 1)
+            # # w = _second_hand_shape[1][3] / 2 * sin + hp / tan
+            # # if w > 0:
+            # #     w = math.ceil(w)
+            # # else:
+            # #     w = math.floor(w)
+            # # print("w ", w) #debe dar 1
+            # p11y = p1y + int(hp) #=p1y
+            # p21y = p2y - int(hp) #=p2y
+            #
+            #
+            # # dx = max(int(hp / tan), 1)
+            # dx = hp / tan
+            # if dx > 0:
+            #     dx = math.ceil(dx)
+            # else:
+            #     dx = math.floor(dx)
+            # p11x = p1x + dx
+            # p11xi = p11x - dx
+            # Para que el range funcione de una valor pequeño a uno grande.
+            # yhigher = max(p11y, p21y)
+            # ylower = min(p11y, p21y)
+
+
+            # TODO tengo el problema que no sumo/resto bien dependiendo el cuadrante.
+            h = _second_hand_shape[1][3]
+            hp = h/2*cos #Creo que la anterior h era incorrecta igualmente. 0.669
+            dx = hp / tan
+            w = int(h/2*sin + dx)
+            p11y = p1y + int(hp)
+            p21y = p2y - int(hp)
+            if p11y < p21y:
+                ylower= p11y
+                yhigher = p21y
+                pxtop = p1x
+            else:
+                ylower = p21y
+                yhigher = p11y
+                pxtop = p2x
+                if -90 < angle < -270:
+                    dx = -dx
+
+            p11x = int(pxtop+dx-h/2*sin)
+            if w < 0: #para el lado izquierdo
+                p11x -=w
+                w = abs(w)
+            # if dx > 0:
+            #     dx = math.ceil(dx)
+            # else:
+            #     dx = math.floor(dx)
+            pix = p11x - dx
+
+            print("dx ", dx)
+            # print(h)
+            # print(w)
+            # print(h * sin)
+            print("hp ", hp)
+            print("p1x ", p1x)
+            print("p11x ", p11x)
+            print("p2x ", p2x)
+            print("p1y ", p1y)
+            print("p11y ", p11y)
+            print("p2y ", p2y)
+            print("p21y ", p21y)
+
+            for y in range(ylower, yhigher-1): #-1  por el xnext
+                # print(" y ", y)
+                # print(int(p11x-(y-p11y)/tan))
+                x = int(p11x-(y-p11y)/tan)
+                x_next = int(p11x-(y+1-p11y)/tan)
+                # print(x)
+                # print(max(w, abs(x_next - x)))
+                #TODO problema con los decimales. A veces las x saltan mucho y entonces el w no es suficiente grueso y el resultado es no continuo.
+                # Si se utiliza max(w, abs(x_next - x)) tampco funciona bien en los tramos verticales. existe algun glich
+                # draw.fill(color, int(p11x-(y-p11y)/tan), y, w, 1)
+
+                # p11xi = p11xi - dx
+                pix += dx
+                # print("p11xi ", p11xi)
+                print ("y ", y)
+                print("pix ", pix)
+                print(color, pix, y, w, 1)
+                # draw.fill(color, int(p11x-(y-p11y)/tan), y, w, 1) #necesito calcularlo cada vez el px
+                # draw.fill(color, p11xi, y, w, 1) #necesito calcularlo cada vez el px
+
+                #TODO ojo con el truncamiento.
+                draw.fill(color, int(pix), y, w, 1)
+                # pix = pix - dx
+                # if dx > 0:
+                #     draw.fill(color, math.ceil(pix), y, w, 1)  # necesito calcularlo cada vez el px
+                # else:
+                #     draw.fill(color, math.floor(pix), y, w, 1) #necesito calcularlo cada vez el px
+
+
+
+
+
+        # for i in range(len(on_screen_hand)):
+        #     # Erase old hand
+        #     # Don't work well with background image and hand drawn from the middle. On_screen_hand don't have all
+        #     # pixels
+        #     draw.fill(_bg, on_screen_hand[i][1] - hand[i][1] // 2, on_screen_hand[i][0] - hand[i][1] // 2,
+        #               hand[i][1],
+        #               hand[i][1])
+        #     # Calculated the new hand
+        #     on_screen_hand[i] = [y_center + int(hand[i][0] * sin),
+        #                          x_center + int(hand[i][0] * cos)]
+        #     # Paint the new hand
+        #     draw.fill(color, on_screen_hand[i][1] - hand[i][1] // 2, on_screen_hand[i][0] - hand[i][1] // 2,
+        #               hand[i][1], hand[i][1])
+        #
+
+    def _update_hand_bresenham(self, time, dial_number, x_center, y_center, hand, on_screen_hand, color):
+        angle = 90 - 360 / dial_number * time  # 90º to rotate. Negative angles for the correct rotation
+
+        cos = math.cos(math.radians(angle))
+        sin = math.sin(math.radians(angle))
+
+        p1x = x_center - _second_hand_shape[1][0]
+        p2x = x_center + int(_second_hand_shape[1][1] * cos)
+        p1y = y_center + _second_hand_shape[1][0]
+        p2y = y_center - int(_second_hand_shape[1][1] * sin)
+        # print("p1x ", p1x)
+        # print("p2x ", p2x)
+        # print("p1y ", p1y)
+        # print("p2y ", p2y)
+        # self.plotLine(color, p1x, p1y, p2x, p2y)
+        self.plotLineWidth(color, p1x, p1y, p2x, p2y, 2) # solo si w > 1
+
+
+
+    def plotLineX(self, color, x0, y0, x1, y1):
+        draw = wasp.watch.drawable
+        # fill_time = 0
+        # starttime = time.process_time()
+
+        dx = abs(x1 - x0)
+        sx = 1 if x0 < x1 else -1
+        dy = -abs(y1 - y0)
+        sy = 1 if y0 < y1 else -1
+        err = dx + dy # error value e_xy
+        # e2 = 0
+
+        wx = sx #optim<zar el fill
+        wy = sy
+
+        while True: # / * loop * /
+            # setPixel(x0, y0)
+            # draw.fill(color, x0, y0, 1, 1)
+            # starttime = time.process_time()
+            # draw.fill(color, x0-1, y0, 2, 1) #TODO hardcodedf width = 2
+            # endtime = time.process_time()
+            # fill_time += endtime - starttime
+
+            if x0 == x1 and y0 == y1:
+                if wx > 0:
+                    draw.fill(color, x0-wx, y0, abs(wx), abs(wy))  # TODO hardcodedf width = 2
+                else:
+                    draw.fill(color, x0, y0, abs(wx), abs(wy))
+                break
+            e2 = 2 * err
+            if e2 >= dy:
+                err += dy
+                x0 += sx # / * e_xy+e_x > 0 * /
+                #nuevo. optimizar el fill.
+                # wx = sx+wx if e2 > dx else sx
+                wx = sx + wx
+
+            if e2 <= dx: #salta de linea
+                if wx > 0:
+                    draw.fill(color, x0-wx, y0, abs(wx), abs(wy))  # TODO hardcodedf width = 2
+                else:
+                    draw.fill(color, x0, y0, abs(wx), abs(wy))
+                wx = sx
+
+                err += dx
+                y0 += sy # / * e_xy+e_y < 0 * /
+
+        # print("fill time: ", 10 * fill_time)
+
+
+    """Funciona pero se debe optimizar el fill"""
+    def plotLine2(self, color, x0, y0, x1, y1):
+        draw = wasp.watch.drawable
+        # fill_time = 0
+        # starttime = time.process_time()
+
+        dx = abs(x1 - x0)
+        sx = 1 if x0 < x1 else -1
+        dy = -abs(y1 - y0)
+        sy = 1 if y0 < y1 else -1
+        err = dx + dy # error value e_xy
+        # e2 = 0
+
+        while True: # / * loop * /
+            # setPixel(x0, y0)
+            # draw.fill(color, x0, y0, 1, 1)
+            # starttime = time.process_time()
+            draw.fill(color, x0, y0, 1, 1) #TODO hardcodedf width = 2
+            # endtime = time.process_time()
+            # fill_time += endtime - starttime
+
+            if x0 == x1 and y0 == y1:
+                break
+            e2 = 2 * err
+            if e2 >= dy:
+                err += dy
+                x0 += sx # / * e_xy+e_x > 0 * /
+            if e2 <= dx:
+                err += dx
+                y0 += sy # / * e_xy+e_y < 0 * /
+
+        # print("fill time: ", 10 * fill_time)
+
+    # #TODO. no va
+    # def plotLineWidth(self, color, x0, y0, x1, y1, wd):
+    #     """/* plot an anti-aliased line of width wd */"""
+    #     draw = wasp.watch.drawable
+    #     fill_time = 0
+    #     starttime = time.process_time()
+    #
+    #     dx = abs(x1-x0)
+    #     sx = 1 if x0 < x1 else -1
+    #     dy = abs(y1-y0)
+    #     sy = 1 if y0 < y1 else -1
+    #     err = dx-dy
+    #     # e2, x2, y2;                           /* error value e_xy */
+    #     ed = 1 if dx+dy == 0 else math.sqrt(dx*dx+dy*dy)
+    #
+    #     wd = (wd + 1) / 2
+    #     while True:  #/* pixel loop */
+    #         # print (wd)
+    #         # print(int(max(0,255*(abs(err-dx+dy)/ed-wd+1))))
+    #         starttime = time.process_time()
+    #         draw.fill(color, x0, y0, 1, 1)
+    #         endtime = time.process_time()
+    #         fill_time += endtime - starttime
+    #         # draw.fill(color, x0, y0, int(max(0,255*(abs(err-dx+dy)/ed-wd+1))), 1)
+    #         # setPixelColor(x0, y0, max(0,255*(abs(err-dx+dy)/ed-wd+1)));
+    #         e2 = err
+    #         x2 = x0
+    #         if 2*e2 >= -dx: #   /* x step */
+    #             e2 += dy
+    #             y2 = y0
+    #             while e2 < ed*wd and (y1 != y2 or dx > dy):
+    #                 y2 += sy
+    #                 print(x0)
+    #                 print(y2)
+    #                 print(int(max(0,255*(abs(e2)/ed-wd+1))))
+    #                 starttime = time.process_time()
+    #                 draw.fill(color, x0, y2, 1, 1)
+    #                 endtime = time.process_time()
+    #                 fill_time += endtime-starttime
+    #                 # draw.fill(color, x0, y2, int(max(0,255*(abs(e2)/ed-wd+1))), 1)
+    #                 # setPixelColor(x0, y2 += sy, max(0,255*(abs(e2)/ed-wd+1)))
+    #                 e2 += dx
+    #             if x0 == x1:
+    #                 break
+    #             e2 = err
+    #             err -= dy
+    #             x0 += sx
+    #
+    #         if 2*e2 <= dy: #  /* y step */
+    #             e2 = dx - e2
+    #             while e2 < ed*wd and (x1 != x2 or dx < dy):
+    #                 x2 += sx
+    #                 starttime = time.process_time()
+    #                 draw.fill(color, sx, y0, 1, 1)
+    #                 endtime = time.process_time()
+    #                 fill_time += endtime - starttime
+    #                 # draw.fill(color, sx, y0, int(max(0,255*(abs(e2)/ed-wd+1))), 1)
+    #                 # setPixelColor(x2 += sx, y0, max(0,255*(abs(e2)/ed-wd+1)));
+    #                 e2 += dy
+    #
+    #             if y0 == y1:
+    #                 break
+    #             err += dx
+    #             y0 += sy
+    #
+    #     print("fill time: ",10 * fill_time)
+    #
+    # def plotLineWidth(self, color, x0, y0, x1, y1, wd):
+    #     """/* plot an anti-aliased line of width wd */"""
+    #     draw = wasp.watch.drawable
+    #
+    #     dx = abs(x1-x0)
+    #     sx = 1 if x0 < x1 else -1
+    #     dy = abs(y1-y0)
+    #     sy = 1 if y0 < y1 else -1
+    #     err = dx-dy
+    #     # e2, x2, y2;                           /* error value e_xy */
+    #     ed = 1 if dx+dy == 0 else math.sqrt(dx*dx+dy*dy)
+    #
+    #     wd = (wd + 1) / 2
+    #     while True:  #/* pixel loop */
+    #         # print (wd)
+    #         # print(int(max(0,255*(abs(err-dx+dy)/ed-wd+1))))
+    #         draw.fill(color, x0, y0, int(max(0,255*(abs(err-dx+dy)/ed-wd+1))), 1)
+    #         # setPixelColor(x0, y0, max(0,255*(abs(err-dx+dy)/ed-wd+1)));
+    #         e2 = err
+    #         x2 = x0
+    #         if 2*e2 >= -dx: #   /* x step */
+    #             e2 += dy
+    #             y2 = y0
+    #             while e2 < ed*wd and (y1 != y2 or dx > dy):
+    #                 y2 += sy
+    #                 print(x0)
+    #                 print(y2)
+    #                 print(int(max(0,255*(abs(e2)/ed-wd+1))))
+    #                 # draw.fill(color, x0, y2, int(max(0,255*(abs(e2)/ed-wd+1))), 1)
+    #                 # setPixelColor(x0, y2 += sy, max(0,255*(abs(e2)/ed-wd+1)))
+    #                 e2 += dx
+    #             if x0 == x1:
+    #                 break
+    #             e2 = err
+    #             err -= dy
+    #             x0 += sx
+    #
+    #         if 2*e2 <= dy: #  /* y step */
+    #             e2 = dx - e2
+    #             while e2 < ed*wd and (x1 != x2 or dx < dy):
+    #                 x2 += sx
+    #                 # draw.fill(color, sx, y0, int(max(0,255*(abs(e2)/ed-wd+1))), 1)
+    #                 # setPixelColor(x2 += sx, y0, max(0,255*(abs(e2)/ed-wd+1)));
+    #                 e2 += dy
+    #
+    #             if y0 == y1:
+    #                 break
+    #             err += dx
+    #             y0 += sy
+
+
+    """Optimizado para el fill. No es perfecto aun! falta opimitzarlo por el low y y el high x. dependiendo de la zona, varia más las x o las y (la frontera son los 45º de cada cuadrante)"""
+    def plotLine(self, color, x0, y0, x1, y1):
+        if abs(y1 - y0) < abs(x1 - x0):
+            if x0 > x1:
+                self.plotLineLow(color, x1, y1, x0, y0)
+            else:
+                self.plotLineLow(color, x0, y0, x1, y1)
+        else:
+            if y0 > y1:
+                self.plotLineHigh(color, x1, y1, x0, y0)
+            else:
+                self.plotLineHigh(color, x0, y0, x1, y1)
+
+    """Solo optimizo por x"""
+    def plotLineLow(self, color, x0, y0, x1, y1):
+        draw = wasp.watch.drawable
+        dx = x1 - x0
+        dy = y1 - y0
+        yi = 1
+        if dy < 0:
+            yi = -1
+            dy = -dy
+        D = (2 * dy) - dx
+        y = y0
+
+        wx = 1
+        for x in range(x0, x1):
+            # draw.fill(color, x, y, 1, 1)
+            if D > 0:
+                draw.fill(color, x-wx+1, y, wx, 1)
+                wx = 1
+                y = y + yi
+                D = D + (2 * (dy - dx))
+            else:
+                wx += 1
+                D = D + 2 * dy
+        draw.fill(color, x1 - wx+1, y, wx, 1)
+
+    """Solo optimizo por y"""
+    def plotLineHigh(self, color, x0, y0, x1, y1):
+        draw = wasp.watch.drawable
+        dx = x1 - x0
+        dy = y1 - y0
+        xi = 1
+        if dx < 0:
+            xi = -1
+            dx = -dx
+        D = (2 * dx) - dy
+        x = x0
+
+        wy = 1
+        for y in range(y0, y1):
+            # draw.fill(color, x, y, 1, 1)
+            if D > 0:
+                draw.fill(color, x, y-wy+1, 1, wy)
+                wy = 1
+                x = x + xi
+                D = D + (2 * (dx - dy))
+            else:
+                wy +=1
+                D = D + 2*dx
+        draw.fill(color, x, y1-wy+1, 1, wy)
+
+    """demasiado lenta"""
+    def plotLineWidth(self, color, x0, y0, x1, y1, wd):
+        """/* plot non anti-aliased line of width wd */"""
+        draw = wasp.watch.drawable
+
+        dx = abs(x1-x0)
+        sx = 1 if x0 < x1 else -1
+        dy = abs(y1-y0)
+        sy = 1 if y0 < y1 else -1
+        err = dx-dy
+        # e2, x2, y2;                           /* error value e_xy */
+        ed = 1 if dx+dy == 0 else math.sqrt(dx*dx+dy*dy)
+
+        wd = (wd + 1) / 2
+        while True:  #/* pixel loop */
+            # print (wd)
+            # print(int(max(0,255*(abs(err-dx+dy)/ed-wd+1))))
+            # draw.fill(color, x0, y0, int(max(0,255*(abs(err-dx+dy)/ed-wd+1))), 1)
+            # setPixelColor(x0, y0, max(0,255*(abs(err-dx+dy)/ed-wd+1)));
+            #No le pongo antialiasing
+            draw.fill(color, x0, y0, 1, 1)
+            e2 = err
+            x2 = x0
+            if 2*e2 >= -dx: #   /* x step */
+                e2 += dy
+                y2 = y0
+                while e2 < ed*wd and (y1 != y2 or dx > dy):
+                    y2 += sy
+                    # print(x0)
+                    # print(y2)
+                    # print(int(max(0,255*(abs(e2)/ed-wd+1))))
+                    # draw.fill(color, x0, y2, int(max(0,255*(abs(e2)/ed-wd+1))), 1)
+                    # setPixelColor(x0, y2 += sy, max(0,255*(abs(e2)/ed-wd+1)))
+                    # No le pongo antialiasing
+                    draw.fill(color, x0, y2, 1, 1)
+                    e2 += dx
+                if x0 == x1:
+                    break
+                e2 = err
+                err -= dy
+                x0 += sx
+
+            if 2*e2 <= dy: #  /* y step */
+                e2 = dx - e2
+                while e2 < ed*wd and (x1 != x2 or dx < dy):
+                    x2 += sx
+                    # draw.fill(color, sx, y0, int(max(0,255*(abs(e2)/ed-wd+1))), 1)
+                    # setPixelColor(x2 += sx, y0, max(0,255*(abs(e2)/ed-wd+1)));
+                    # No le pongo antialiasing
+                    draw.fill(color, x2, y0, 1, 1)
+                    e2 += dy
+
+                if y0 == y1:
+                    break
+                err += dx
+                y0 += sy

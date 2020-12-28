@@ -21,6 +21,7 @@ import micropython
 import watch
 import widgets
 
+from apps.analog_clock import AnalogClock
 from apps.clock import ClockApp
 from apps.flashlight import FlashlightApp
 from apps.heart import HeartApp
@@ -30,6 +31,14 @@ from apps.settings import SettingsApp
 from apps.steps import StepCounterApp
 from apps.stopwatch import StopwatchApp
 from apps.testapp import TestApp
+
+from apps.draw_line import DrawLineApp
+from apps.analog_clock_Bresenham_chello import AnalogBresnChelloClock
+from apps.analog_clock_wikipedia import AnalogWikiClock
+from apps.analog_clock_wikipedia_fill import AnalogWikiClockFill
+from apps.analog_clock_sin_cos import AnalogSinCosClock
+
+
 
 class EventType():
     """Enumerated interface actions.
@@ -115,7 +124,13 @@ class Manager():
         self._scheduling = False
 
         # TODO: Eventually these should move to main.py
-        for app, qr in ( (ClockApp, True),
+        for app, qr in ((DrawLineApp, True),
+                        (AnalogClock, True),
+                        (AnalogSinCosClock, True),
+                        (AnalogWikiClock, True),
+                        (AnalogWikiClockFill, True),
+                        (AnalogBresnChelloClock, True),
+                         (ClockApp, True),
                          (StepCounterApp, True),
                          (StopwatchApp, True),
                          (HeartApp, True),

@@ -39,46 +39,46 @@ class ClockApp():
     ICON = icons.clock
 
     def __init__(self):
-        self.meter = wasp.widgets.BatteryMeter()
-        self.notifier = wasp.widgets.StatusBar()
+        self._meter = wasp.widgets.BatteryMeter()
+        self._notifier = wasp.widgets.StatusBar()
 
     def foreground(self):
         """Activate the application."""
-        self.on_screen = ( -1, -1, -1, -1, -1, -1 )
-        self.draw()
+        self._on_screen = (-1, -1, -1, -1, -1, -1)
+        self._draw()
         wasp.system.request_tick(1000)
 
     def sleep(self):
         return True
 
     def wake(self):
-        self.update()
+        self._update()
 
     def tick(self, ticks):
-        self.update()
+        self._update()
 
-    def draw(self):
+    def _draw(self):
         """Redraw the display from scratch."""
         draw = wasp.watch.drawable
 
         draw.fill()
         draw.rleblit(digits.clock_colon, pos=(2*48, 80), fg=0xb5b6)
-        self.on_screen = ( -1, -1, -1, -1, -1, -1 )
-        self.update()
-        self.meter.draw()
+        self._on_screen = (-1, -1, -1, -1, -1, -1)
+        self._update()
+        self._meter.draw()
 
-    def update(self):
+    def _update(self):
         """Update the display (if needed).
 
         The updates are a lazy as possible and rely on an prior call to
         draw() to ensure the screen is suitably prepared.
         """
         now = wasp.watch.rtc.get_localtime()
-        if now[3] == self.on_screen[3] and now[4] == self.on_screen[4]:
-            if now[5] != self.on_screen[5]:
-                self.meter.update()
-                self.notifier.update()
-                self.on_screen = now
+        if now[3] == self._on_screen[3] and now[4] == self._on_screen[4]:
+            if now[5] != self._on_screen[5]:
+                self._meter.update()
+                self._notifier.update()
+                self._on_screen = now
             return False
 
         draw = wasp.watch.drawable
@@ -86,13 +86,13 @@ class ClockApp():
         draw.rleblit(DIGITS[now[4] // 10], pos=(3*48, 80), fg=0xbdb6)
         draw.rleblit(DIGITS[now[3]  % 10], pos=(1*48, 80))
         draw.rleblit(DIGITS[now[3] // 10], pos=(0*48, 80), fg=0xbdb6)
-        self.on_screen = now
+        self._on_screen = now
 
         month = now[1] - 1
         month = MONTH[month*3:(month+1)*3]
         draw.string('{} {} {}'.format(now[2], month, now[0]),
                 0, 180, width=240)
 
-        self.meter.update()
-        self.notifier.update()
+        self._meter.update()
+        self._notifier.update()
         return True

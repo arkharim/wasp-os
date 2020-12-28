@@ -166,6 +166,8 @@ class ST7789(object):
         self.set_window(x, y, w, h)
 
         # Populate the line buffer
+        # yo creo que aqui el buffer es primero el pixel y despues el color. ocupan 2 lineas.
+        #despues lo que hace es llenar cada linea en vertical.
         buf = memoryview(self.linebuffer)[0:2*w]
         for xi in range(0, 2*w, 2):
             buf[xi] = bg >> 8
