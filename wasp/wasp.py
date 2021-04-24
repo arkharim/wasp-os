@@ -30,6 +30,7 @@ from apps.settings import SettingsApp
 from apps.steps import StepCounterApp
 from apps.stopwatch import StopwatchApp
 from apps.testapp import TestApp
+from apps.chrono import ChronoApp
 
 from apps.draw_line import DrawLineApp
 from apps.analog_clock_Bresenham_chello import AnalogBresnChelloClock
@@ -144,19 +145,20 @@ class Manager():
         self._scheduling = False
 
         # TODO: Eventually these should move to main.py
-        for app, qr in ((DrawLineApp, True),
-                        (AnalogClock, True),
-                        (AnalogSinCosClock, True),
-                        (AnalogWikiClock, True),
-                        (AnalogWikiClockFill, True),
-                        (AnalogBresnChelloClock, True),
+        for app, qr in (#(DrawLineApp, True),
+                        # (AnalogClock, True),
+                        # (AnalogSinCosClock, True),
+                        # (AnalogWikiClock, True),
+                        # (AnalogWikiClockFill, True),
+                        # (AnalogBresnChelloClock, True),
                          (ClockApp, True),
                          (StepCounterApp, True),
                          (StopwatchApp, True),
                          (HeartApp, True),
                          (FlashlightApp, False),
                          (SettingsApp, False),
-                         (TestApp, False) ):
+                         (TestApp, False),
+                         (ChronoApp, True)):
             try:
                 self.register(app(), qr)
             except:

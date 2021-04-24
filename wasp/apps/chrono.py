@@ -78,8 +78,14 @@ class ChronoApp():
 
             self._hh = 0
             self._mm = 0
+            self._ss = 0
         else:
             now = wasp.system.bar.update()
+            ss = 6 * self._ss
+            draw.polar(120, 120, ss, 5, 106, 2, 0)
+            self._ss = now[5]
+            ss = 6 * self._ss
+            draw.polar(120, 120, ss, 5, 106, 2, hi)
             if not now or self._mm == now[4]:
                 # Skip the update
                 return
@@ -93,6 +99,7 @@ class ChronoApp():
         # Record the minute that is currently being displayed
         self._hh = now[3]
         self._mm = now[4]
+        self._ss = now[5]
 
         # Draw the new time
         hh = (30 * (self._hh % 12)) + (self._mm / 2)
